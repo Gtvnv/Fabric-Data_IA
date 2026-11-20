@@ -1,0 +1,124 @@
+# Fonte de verdade das tabelas Gold (Req. 4.5, 4.9, 11.5, 11.8).
+# Usada por infra/gen_gold_ddl.py (DDL Delta e T-SQL) e para gerar/validar o
+# dicionário de dados (docs/data-dictionary.*) via platform_lib.docs_tools.
+#
+# Por coluna: tipo (Spark SQL), descricao e sensibilidade
+# (pública | interna | confidencial | restrita). `nullable: false` marca NOT NULL.
+# Chave 'config.ultima_atualizacao' usa o esquema 'config'; as demais ficam em 'dbo'.
+tables:
+  dim_cliente:
+    descricao: "Dimensão de clientes, SCD tipo 2 (uma linha por versão)"
+    columns:
+      sk_cliente: {tipo: bigint, nullable: false, descricao: "Chave substituta do cliente (-1 = Desconhecido)", sensibilidade: interna}
+      cliente_id: {tipo: bigint, descricao: "Chave de negócio do cliente na origem", sensibilidade: confidencial}
+      nome_mascarado: {tipo: string, descricao: "Nome do cliente mascarado (sem dado pessoal direto)", sensibilidade: confidencial}
+      cidade: {tipo: string, descricao: "Cidade do cliente", sensibilidade: interna}
+      uf: {tipo: string, descricao: "Unidade da federação do cliente", sensibilidade: interna}
+      data_inicio: {tipo: date, nullable: false, descricao: "Início de vigência da versão", sensibilidade: interna}
+      data_fim: {tipo: date, nullable: false, descricao: "Fim de vigência da versão (9999-12-31 se aberta)", sensibilidade: interna}
+      vigente: {tipo: boolean, nullable: false, descricao: "Indica a versão vigente do cliente", sensibilidade: interna}
+  dim_produto:
+    descricao: "Dimensão de produtos"
+    columns:
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto (-1 = Desconhecido)", sensibilidade: interna}
+      produto_id: {tipo: bigint, descricao: "Chave de negócio do produto na origem", sensibilidade: interna}
+      nome: {tipo: string, descricao: "Nome do produto", sensibilidade: pública}
+      categoria: {tipo: string, descricao: "Categoria do produto", sensibilidade: pública}
+      subcategoria: {tipo: string, descricao: "Subcategoria do produto", sensibilidade: pública}
+      preco_lista: {tipo: "decimal(18,2)", descricao: "Preço de lista do produto em BRL", sensibilidade: interna}
+  dim_loja:
+    descricao: "Dimensão de lojas"
+    columns:
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja (-1 = Desconhecido)", sensibilidade: interna}
+      loja_id: {tipo: bigint, descricao: "Chave de negócio da loja na origem", sensibilidade: interna}
+      nome: {tipo: string, descricao: "Nome da loja", sensibilidade: pública}
+      regiao: {tipo: string, descricao: "Região da loja", sensibilidade: pública}
+      cidade: {tipo: string, descricao: "Cidade da loja", sensibilidade: pública}
+      uf: {tipo: string, descricao: "Unidade da federação da loja", sensibilidade: pública}
+  dim_calendario:
+    descricao: "Dimensão de calendário contínuo"
+    columns:
+      sk_data: {tipo: int, nullable: false, descricao: "Chave substituta da data no formato yyyymmdd (-1 = Desconhecido)", sensibilidade: pública}
+      data: {tipo: date, descricao: "Data do calendário", sensibilidade: pública}
+      ano: {tipo: int, descricao: "Ano", sensibilidade: pública}
+      trimestre: {tipo: int, descricao: "Trimestre do ano (1 a 4)", sensibilidade: pública}
+      mes: {tipo: int, descricao: "Mês do ano (1 a 12)", sensibilidade: pública}
+      dia: {tipo: int, descricao: "Dia do mês", sensibilidade: pública}
+      dia_semana: {tipo: int, descricao: "Dia da semana (1 = segunda a 7 = domingo)", sensibilidade: pública}
+  fato_vendas:
+    descricao: "Fato de vendas, uma linha por venda"
+    columns:
+      venda_id: {tipo: bigint, nullable: false, descricao: "Identificador da venda na origem", sensibilidade: interna}
+      sk_cliente: {tipo: bigint, nullable: false, descricao: "Chave substituta do cliente", sensibilidade: interna}
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto", sensibilidade: interna}
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja", sensibilidade: interna}
+      sk_data: {tipo: int, nullable: false, descricao: "Chave substituta da data da venda (yyyymmdd)", sensibilidade: interna}
+      quantidade: {tipo: int, nullable: false, descricao: "Quantidade de itens vendidos", sensibilidade: interna}
+      valor_venda: {tipo: "decimal(18,2)", nullable: false, descricao: "Valor da venda em BRL", sensibilidade: confidencial}
+      custo_total: {tipo: "decimal(18,2)", nullable: false, descricao: "Custo total da venda em BRL", sensibilidade: restrita}
+  agg_vendas_dia:
+    descricao: "Agregação de vendas por dia, produto e loja"
+    columns:
+      sk_data: {tipo: int, nullable: false, descricao: "Chave substituta da data (yyyymmdd)", sensibilidade: interna}
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto", sensibilidade: interna}
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja", sensibilidade: interna}
+      quantidade: {tipo: bigint, nullable: false, descricao: "Quantidade total vendida no dia", sensibilidade: interna}
+      valor_venda: {tipo: "decimal(18,2)", nullable: false, descricao: "Valor total vendido no dia em BRL", sensibilidade: confidencial}
+      custo_total: {tipo: "decimal(18,2)", nullable: false, descricao: "Custo total do dia em BRL", sensibilidade: restrita}
+  fato_estoque:
+    descricao: "Fato de posição de estoque por dia, produto e loja"
+    columns:
+      sk_data: {tipo: int, nullable: false, descricao: "Chave substituta da data da posição (yyyymmdd)", sensibilidade: interna}
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto", sensibilidade: interna}
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja", sensibilidade: interna}
+      quantidade_estoque: {tipo: int, nullable: false, descricao: "Quantidade em estoque na data", sensibilidade: interna}
+  features_demanda:
+    descricao: "Features de demanda, uma linha por produto, loja e dia (sem dados pessoais)"
+    columns:
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto", sensibilidade: interna}
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja", sensibilidade: interna}
+      data: {tipo: date, nullable: false, descricao: "Data da observação", sensibilidade: interna}
+      ano: {tipo: int, descricao: "Ano da data", sensibilidade: interna}
+      mes: {tipo: int, descricao: "Mês da data", sensibilidade: interna}
+      dia: {tipo: int, descricao: "Dia do mês", sensibilidade: interna}
+      dia_semana: {tipo: int, descricao: "Dia da semana (0 = segunda a 6 = domingo)", sensibilidade: interna}
+      fim_de_semana: {tipo: boolean, descricao: "Indica sábado ou domingo", sensibilidade: interna}
+      lag_1: {tipo: double, descricao: "Quantidade vendida 1 dia antes", sensibilidade: interna}
+      lag_7: {tipo: double, descricao: "Quantidade vendida 7 dias antes", sensibilidade: interna}
+      lag_14: {tipo: double, descricao: "Quantidade vendida 14 dias antes", sensibilidade: interna}
+      media_movel_7: {tipo: double, descricao: "Média da quantidade nos 7 dias anteriores", sensibilidade: interna}
+      media_movel_28: {tipo: double, descricao: "Média da quantidade nos 28 dias anteriores", sensibilidade: interna}
+      qtd_alvo: {tipo: double, descricao: "Quantidade vendida no dia (variável alvo)", sensibilidade: interna}
+  features_churn:
+    descricao: "Features de churn, uma linha por cliente e data de referência (sem dados pessoais)"
+    columns:
+      sk_cliente: {tipo: bigint, nullable: false, descricao: "Chave substituta do cliente", sensibilidade: interna}
+      data_ref: {tipo: date, nullable: false, descricao: "Data de referência das features", sensibilidade: interna}
+      recencia_dias: {tipo: int, descricao: "Dias desde a última compra até a data de referência", sensibilidade: interna}
+      frequencia: {tipo: int, descricao: "Número de compras até a data de referência", sensibilidade: interna}
+      valor_total: {tipo: double, descricao: "Valor total comprado até a data de referência em BRL", sensibilidade: confidencial}
+      churn_alvo: {tipo: int, descricao: "1 se não houve compra no horizonte seguinte (variável alvo)", sensibilidade: interna}
+  previsao_demanda:
+    descricao: "Previsão de demanda por produto, loja e dia"
+    columns:
+      sk_produto: {tipo: bigint, nullable: false, descricao: "Chave substituta do produto", sensibilidade: interna}
+      sk_loja: {tipo: bigint, nullable: false, descricao: "Chave substituta da loja", sensibilidade: interna}
+      data: {tipo: date, nullable: false, descricao: "Data prevista", sensibilidade: interna}
+      previsao: {tipo: double, nullable: false, descricao: "Quantidade prevista", sensibilidade: interna}
+      modelo: {tipo: string, nullable: false, descricao: "Nome do modelo que gerou a previsão", sensibilidade: interna}
+      versao_modelo: {tipo: string, nullable: false, descricao: "Versão do modelo no registro MLflow", sensibilidade: interna}
+      pontuado_em_utc: {tipo: timestamp, nullable: false, descricao: "Momento da pontuação em UTC", sensibilidade: interna}
+  previsao_churn:
+    descricao: "Probabilidade de churn por cliente e data de referência"
+    columns:
+      sk_cliente: {tipo: bigint, nullable: false, descricao: "Chave substituta do cliente", sensibilidade: interna}
+      data_ref: {tipo: date, nullable: false, descricao: "Data de referência da pontuação", sensibilidade: interna}
+      prob_churn: {tipo: double, nullable: false, descricao: "Probabilidade de churn entre 0 e 1", sensibilidade: confidencial}
+      modelo: {tipo: string, nullable: false, descricao: "Nome do modelo que gerou a previsão", sensibilidade: interna}
+      versao_modelo: {tipo: string, nullable: false, descricao: "Versão do modelo no registro MLflow", sensibilidade: interna}
+      pontuado_em_utc: {tipo: timestamp, nullable: false, descricao: "Momento da pontuação em UTC", sensibilidade: interna}
+  config.ultima_atualizacao:
+    descricao: "Última atualização dos dados, exibida nos relatórios"
+    columns:
+      ts_utc: {tipo: timestamp, nullable: false, descricao: "Momento da última atualização em UTC", sensibilidade: pública}
+      ts_sao_paulo_texto: {tipo: string, nullable: false, descricao: "Momento da última atualização em America/Sao_Paulo, em texto", sensibilidade: pública}
