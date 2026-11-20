@@ -1,0 +1,356 @@
+{
+  "properties": {
+    "parameters": {
+      "entidade": {
+        "type": "string"
+      },
+      "destino": {
+        "type": "string"
+      },
+      "chave": {
+        "type": "string"
+      },
+      "coluna_watermark": {
+        "type": "string"
+      },
+      "origem_tipo": {
+        "type": "string"
+      },
+      "consulta": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "kv_secret_sql": {
+        "type": "string"
+      },
+      "kv_secret_storage": {
+        "type": "string"
+      },
+      "kv_uri": {
+        "type": "string"
+      },
+      "source_container": {
+        "type": "string"
+      }
+    },
+    "activities": [
+      {
+        "name": "LerSegredoKeyVault",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:05:00",
+          "secureInput": true,
+          "secureOutput": true
+        },
+        "dependsOn": [],
+        "typeProperties": {
+          "method": "GET",
+          "relativeUrl": "@concat('secrets/',if(equals(pipeline().parameters.origem_tipo,'arquivo'),pipeline().parameters.kv_secret_storage,pipeline().parameters.kv_secret_sql),'?api-version=7.4')"
+        },
+        "externalReferences": {
+          "connection": "${CONN_KEYVAULT}"
+        }
+      },
+      {
+        "name": "LookupMarca",
+        "type": "Lookup",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:10:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "LerSegredoKeyVault",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "LakehouseTableSource",
+            "datasetSettings": {
+              "type": "LakehouseTable",
+              "typeProperties": {
+                "schema": "config",
+                "table": "ingestao_watermark"
+              },
+              "externalReferences": {
+                "connection": "${CONN_LAKEHOUSE_CONFIG}"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "FiltrarMarca",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "LookupMarca",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('LookupMarca').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@equals(item().entidade,pipeline().parameters.entidade)",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CopiarOrigem",
+        "type": "Switch",
+        "dependsOn": [
+          {
+            "activity": "FiltrarMarca",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "on": {
+            "value": "@pipeline().parameters.origem_tipo",
+            "type": "Expression"
+          },
+          "cases": [
+            {
+              "value": "azure_sql",
+              "activities": [
+                {
+                  "name": "CopySql",
+                  "type": "Copy",
+                  "policy": {
+                    "retry": 3,
+                    "retryIntervalInSeconds": 60,
+                    "timeout": "0.01:00:00",
+                    "secureInput": false,
+                    "secureOutput": false
+                  },
+                  "dependsOn": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "AzureSqlSource",
+                      "sqlReaderQuery": {
+                        "value": "@if(empty(if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,''))),pipeline().parameters.consulta,concat('SELECT * FROM (',pipeline().parameters.consulta,') q WHERE ',pipeline().parameters.coluna_watermark,\" > '\",if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,'')),\"'\"))",
+                        "type": "Expression"
+                      },
+                      "queryTimeout": "02:00:00",
+                      "datasetSettings": {
+                        "type": "AzureSqlTable",
+                        "externalReferences": {
+                          "connection": "${CONN_AZURE_SQL}"
+                        }
+                      }
+                    },
+                    "sink": {
+                      "type": "ParquetSink",
+                      "storeSettings": {
+                        "type": "LakehouseWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "ParquetWriteSettings"
+                      },
+                      "datasetSettings": {
+                        "type": "Parquet",
+                        "typeProperties": {
+                          "location": {
+                            "type": "LakehouseLocation",
+                            "folderPath": "@concat('staging/',pipeline().parameters.entidade,'/',pipeline().parameters.run_id)"
+                          }
+                        },
+                        "externalReferences": {
+                          "connection": "${CONN_LAKEHOUSE_STAGING}"
+                        }
+                      }
+                    },
+                    "enableStaging": false
+                  }
+                }
+              ]
+            },
+            {
+              "value": "arquivo",
+              "activities": [
+                {
+                  "name": "CopyArquivo",
+                  "type": "Copy",
+                  "policy": {
+                    "retry": 3,
+                    "retryIntervalInSeconds": 60,
+                    "timeout": "0.01:00:00",
+                    "secureInput": false,
+                    "secureOutput": false
+                  },
+                  "dependsOn": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "DelimitedTextSource",
+                      "formatSettings": {
+                        "type": "DelimitedTextReadSettings"
+                      },
+                      "storeSettings": {
+                        "type": "AzureBlobFSReadSettings",
+                        "recursive": true,
+                        "wildcardFileName": {
+                          "value": "@pipeline().parameters.consulta",
+                          "type": "Expression"
+                        }
+                      },
+                      "datasetSettings": {
+                        "type": "DelimitedText",
+                        "typeProperties": {
+                          "location": {
+                            "type": "AzureBlobFSLocation",
+                            "fileSystem": "@pipeline().parameters.source_container"
+                          },
+                          "columnDelimiter": ",",
+                          "firstRowAsHeader": true
+                        },
+                        "externalReferences": {
+                          "connection": "${CONN_OBJECT_STORAGE}"
+                        }
+                      }
+                    },
+                    "sink": {
+                      "type": "ParquetSink",
+                      "storeSettings": {
+                        "type": "LakehouseWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "ParquetWriteSettings"
+                      },
+                      "datasetSettings": {
+                        "type": "Parquet",
+                        "typeProperties": {
+                          "location": {
+                            "type": "LakehouseLocation",
+                            "folderPath": "@concat('staging/',pipeline().parameters.entidade,'/',pipeline().parameters.run_id)"
+                          }
+                        },
+                        "externalReferences": {
+                          "connection": "${CONN_LAKEHOUSE_STAGING}"
+                        }
+                      }
+                    },
+                    "enableStaging": false
+                  }
+                }
+              ]
+            }
+          ],
+          "defaultActivities": [
+            {
+              "name": "OrigemInvalida",
+              "type": "Fail",
+              "typeProperties": {
+                "message": "origem_tipo não suportado",
+                "errorCode": "ORIGEM_INVALIDA"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "MergeBronze",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.02:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "CopiarOrigem",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_BRONZE_MERGE_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}",
+          "parameters": {
+            "entidade": {
+              "value": "@pipeline().parameters.entidade",
+              "type": "Expression"
+            },
+            "destino": {
+              "value": "@pipeline().parameters.destino",
+              "type": "Expression"
+            },
+            "chave": {
+              "value": "@pipeline().parameters.chave",
+              "type": "Expression"
+            },
+            "coluna_watermark": {
+              "value": "@pipeline().parameters.coluna_watermark",
+              "type": "Expression"
+            },
+            "origem_tipo": {
+              "value": "@pipeline().parameters.origem_tipo",
+              "type": "Expression"
+            },
+            "run_id": {
+              "value": "@pipeline().parameters.run_id",
+              "type": "Expression"
+            },
+            "marca_anterior": {
+              "value": "@if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,''))",
+              "type": "Expression"
+            },
+            "modo": {
+              "value": "merge",
+              "type": "string"
+            }
+          }
+        }
+      },
+      {
+        "name": "AtualizarMarca",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:30:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "MergeBronze",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_BRONZE_MERGE_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}",
+          "parameters": {
+            "modo": {
+              "value": "atualizar_marca",
+              "type": "string"
+            },
+            "entidade": {
+              "value": "@pipeline().parameters.entidade",
+              "type": "Expression"
+            },
+            "novo_valor": {
+              "value": "@json(activity('MergeBronze').output.result.exitValue).novo_valor",
+              "type": "Expression"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

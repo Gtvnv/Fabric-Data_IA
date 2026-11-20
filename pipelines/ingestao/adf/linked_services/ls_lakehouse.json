@@ -1,0 +1,21 @@
+{
+  "name": "ls_lakehouse",
+  "properties": {
+    "type": "Lakehouse",
+    "typeProperties": {
+      "workspaceId": "${FABRIC_WORKSPACE_ID}",
+      "artifactId": "${LAKEHOUSE_ID}",
+      "tenant": "${FABRIC_TENANT_ID}",
+      "servicePrincipalId": "${FABRIC_CLIENT_ID}",
+      "servicePrincipalCredentialType": "ServicePrincipalKey",
+      "servicePrincipalCredential": {
+        "type": "AzureKeyVaultSecret",
+        "store": {
+          "referenceName": "ls_key_vault",
+          "type": "LinkedServiceReference"
+        },
+        "secretName": "${KEY_VAULT_SECRET_FABRIC_SP_NAME}"
+      }
+    }
+  }
+}

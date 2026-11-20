@@ -1,0 +1,22 @@
+{
+  "name": "ds_lakehouse_config",
+  "properties": {
+    "type": "LakehouseTable",
+    "linkedServiceName": {
+      "referenceName": "ls_lakehouse",
+      "type": "LinkedServiceReference"
+    },
+    "parameters": {
+      "tabela": {
+        "type": "string"
+      }
+    },
+    "typeProperties": {
+      "schema": "config",
+      "table": {
+        "value": "@dataset().tabela",
+        "type": "Expression"
+      }
+    }
+  }
+}

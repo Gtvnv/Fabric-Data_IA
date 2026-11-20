@@ -1,0 +1,26 @@
+{
+  "name": "ds_arquivos_csv",
+  "properties": {
+    "type": "DelimitedText",
+    "linkedServiceName": {
+      "referenceName": "ls_object_storage",
+      "type": "LinkedServiceReference"
+    },
+    "parameters": {
+      "container": {
+        "type": "string"
+      }
+    },
+    "typeProperties": {
+      "location": {
+        "type": "AzureBlobFSLocation",
+        "fileSystem": {
+          "value": "@dataset().container",
+          "type": "Expression"
+        }
+      },
+      "columnDelimiter": ",",
+      "firstRowAsHeader": true
+    }
+  }
+}

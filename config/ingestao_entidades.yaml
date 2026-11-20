@@ -1,0 +1,42 @@
+# Entidades da Pipeline_Ingestao (Req. 3.1, 3.2). Fonte da tabela config.ingestao_entidades.
+# Máximo de 500 entidades ativas por execução. Nenhuma credencial aqui: as conexões
+# vêm de linked services que leem segredos somente do Key Vault (Req. 3.10).
+# origem_tipo: azure_sql | arquivo
+# chave: colunas da chave de carga (MERGE na Bronze), separadas por vírgula
+# consulta: SQL (azure_sql) ou padrão de arquivos relativo ao container (arquivo)
+entidades:
+  - entidade: clientes
+    ativo: true
+    origem_tipo: azure_sql
+    consulta: SELECT * FROM dbo.clientes
+    chave: cliente_id
+    coluna_watermark: atualizado_em
+    destino: bronze.clientes
+  - entidade: produtos
+    ativo: true
+    origem_tipo: azure_sql
+    consulta: SELECT * FROM dbo.produtos
+    chave: produto_id
+    coluna_watermark: atualizado_em
+    destino: bronze.produtos
+  - entidade: lojas
+    ativo: true
+    origem_tipo: azure_sql
+    consulta: SELECT * FROM dbo.lojas
+    chave: loja_id
+    coluna_watermark: atualizado_em
+    destino: bronze.lojas
+  - entidade: vendas
+    ativo: true
+    origem_tipo: azure_sql
+    consulta: SELECT * FROM dbo.vendas
+    chave: venda_id
+    coluna_watermark: atualizado_em
+    destino: bronze.vendas
+  - entidade: estoque
+    ativo: true
+    origem_tipo: arquivo
+    consulta: estoque/*.csv
+    chave: produto_id,loja_id,data_posicao
+    coluna_watermark: data_posicao
+    destino: bronze.estoque

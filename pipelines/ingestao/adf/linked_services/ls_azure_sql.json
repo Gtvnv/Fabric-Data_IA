@@ -1,0 +1,20 @@
+{
+  "name": "ls_azure_sql",
+  "properties": {
+    "type": "AzureSqlDatabase",
+    "typeProperties": {
+      "server": "${AZURE_SQL_SERVER}",
+      "database": "${AZURE_SQL_DATABASE}",
+      "authenticationType": "SQL",
+      "userName": "${AZURE_SQL_USER}",
+      "password": {
+        "type": "AzureKeyVaultSecret",
+        "store": {
+          "referenceName": "ls_key_vault",
+          "type": "LinkedServiceReference"
+        },
+        "secretName": "${KEY_VAULT_SECRET_SQL_PASSWORD_NAME}"
+      }
+    }
+  }
+}

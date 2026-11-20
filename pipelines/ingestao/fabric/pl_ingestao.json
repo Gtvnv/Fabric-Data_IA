@@ -1,0 +1,232 @@
+{
+  "properties": {
+    "parameters": {
+      "run_id": {
+        "type": "string"
+      },
+      "paralelismo": {
+        "type": "int",
+        "defaultValue": 4
+      },
+      "kv_secret_sql": {
+        "type": "string"
+      },
+      "kv_secret_storage": {
+        "type": "string"
+      },
+      "kv_uri": {
+        "type": "string"
+      },
+      "source_container": {
+        "type": "string"
+      }
+    },
+    "variables": {
+      "falhas": {
+        "type": "Array"
+      }
+    },
+    "activities": [
+      {
+        "name": "VerificarKeyVaultGlobal",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:05:00",
+          "secureInput": true,
+          "secureOutput": true
+        },
+        "dependsOn": [],
+        "typeProperties": {
+          "method": "GET",
+          "relativeUrl": "@concat('secrets/',pipeline().parameters.kv_secret_sql,'?api-version=7.4')"
+        },
+        "externalReferences": {
+          "connection": "${CONN_KEYVAULT}"
+        }
+      },
+      {
+        "name": "FalhaKeyVaultGlobal",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "VerificarKeyVaultGlobal",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": "Key Vault indisponível ou segredo ilegível: origem não acessada",
+          "errorCode": "KEYVAULT_INDISPONIVEL"
+        }
+      },
+      {
+        "name": "LookupEntidades",
+        "type": "Lookup",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:10:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "VerificarKeyVaultGlobal",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "LakehouseTableSource",
+            "datasetSettings": {
+              "type": "LakehouseTable",
+              "typeProperties": {
+                "schema": "config",
+                "table": "ingestao_entidades"
+              },
+              "externalReferences": {
+                "connection": "${CONN_LAKEHOUSE_CONFIG}"
+              }
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "ParaCadaEntidade",
+        "type": "ForEach",
+        "dependsOn": [
+          {
+            "activity": "LookupEntidades",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@take(filter(activity('LookupEntidades').output.value,item().ativo),500)",
+            "type": "Expression"
+          },
+          "isSequential": false,
+          "batchCount": {
+            "value": "@pipeline().parameters.paralelismo",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "name": "ProcessarEntidade",
+              "type": "InvokePipeline",
+              "dependsOn": [],
+              "typeProperties": {
+                "pipelineId": "${PIPELINE_INGESTAO_ENTIDADE_ID}",
+                "workspaceId": "${FABRIC_WORKSPACE_ID}",
+                "waitOnCompletion": true,
+                "parameters": {
+                  "run_id": {
+                    "value": "@pipeline().parameters.run_id",
+                    "type": "Expression"
+                  },
+                  "kv_secret_sql": {
+                    "value": "@pipeline().parameters.kv_secret_sql",
+                    "type": "Expression"
+                  },
+                  "kv_secret_storage": {
+                    "value": "@pipeline().parameters.kv_secret_storage",
+                    "type": "Expression"
+                  },
+                  "kv_uri": {
+                    "value": "@pipeline().parameters.kv_uri",
+                    "type": "Expression"
+                  },
+                  "source_container": {
+                    "value": "@pipeline().parameters.source_container",
+                    "type": "Expression"
+                  },
+                  "entidade": {
+                    "value": "@item().entidade",
+                    "type": "Expression"
+                  },
+                  "destino": {
+                    "value": "@item().destino",
+                    "type": "Expression"
+                  },
+                  "chave": {
+                    "value": "@item().chave",
+                    "type": "Expression"
+                  },
+                  "coluna_watermark": {
+                    "value": "@item().coluna_watermark",
+                    "type": "Expression"
+                  },
+                  "origem_tipo": {
+                    "value": "@item().origem_tipo",
+                    "type": "Expression"
+                  },
+                  "consulta": {
+                    "value": "@item().consulta",
+                    "type": "Expression"
+                  }
+                }
+              },
+              "externalReferences": {
+                "connection": "${CONN_INVOKE_PIPELINE}"
+              }
+            },
+            {
+              "name": "RegistrarFalhaEntidade",
+              "type": "AppendVariable",
+              "dependsOn": [
+                {
+                  "activity": "ProcessarEntidade",
+                  "dependencyConditions": [
+                    "Failed"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "variableName": "falhas",
+                "value": {
+                  "value": "@concat(item().entidade,': ',coalesce(activity('ProcessarEntidade').error.message,'erro'))",
+                  "type": "Expression"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "StatusFinal",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "ParaCadaEntidade",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(length(variables('falhas')),0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "FalharExecucao",
+              "type": "Fail",
+              "typeProperties": {
+                "message": {
+                  "value": "@concat('Entidades com falha: ',join(variables('falhas'),' | '))",
+                  "type": "Expression"
+                },
+                "errorCode": "ENTIDADES_COM_FALHA"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

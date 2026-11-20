@@ -1,0 +1,24 @@
+{
+  "name": "ds_staging_parquet",
+  "properties": {
+    "type": "Parquet",
+    "linkedServiceName": {
+      "referenceName": "ls_lakehouse",
+      "type": "LinkedServiceReference"
+    },
+    "parameters": {
+      "pasta": {
+        "type": "string"
+      }
+    },
+    "typeProperties": {
+      "location": {
+        "type": "LakehouseLocation",
+        "folderPath": {
+          "value": "@dataset().pasta",
+          "type": "Expression"
+        }
+      }
+    }
+  }
+}

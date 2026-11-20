@@ -1,0 +1,292 @@
+{
+  "name": "pl_ingestao_entidade",
+  "properties": {
+    "parameters": {
+      "entidade": {
+        "type": "string"
+      },
+      "destino": {
+        "type": "string"
+      },
+      "chave": {
+        "type": "string"
+      },
+      "coluna_watermark": {
+        "type": "string"
+      },
+      "origem_tipo": {
+        "type": "string"
+      },
+      "consulta": {
+        "type": "string"
+      },
+      "run_id": {
+        "type": "string"
+      },
+      "kv_secret_sql": {
+        "type": "string"
+      },
+      "kv_secret_storage": {
+        "type": "string"
+      },
+      "kv_uri": {
+        "type": "string"
+      },
+      "source_container": {
+        "type": "string"
+      },
+      "fabric_workspace_id": {
+        "type": "string"
+      },
+      "fabric_merge_pipeline_id": {
+        "type": "string"
+      }
+    },
+    "activities": [
+      {
+        "name": "LerSegredoKeyVault",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:05:00",
+          "secureInput": true,
+          "secureOutput": true
+        },
+        "dependsOn": [],
+        "typeProperties": {
+          "method": "GET",
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://vault.azure.net"
+          },
+          "url": "@concat(pipeline().parameters.kv_uri,'/secrets/',if(equals(pipeline().parameters.origem_tipo,'arquivo'),pipeline().parameters.kv_secret_storage,pipeline().parameters.kv_secret_sql),'?api-version=7.4')"
+        }
+      },
+      {
+        "name": "LookupMarca",
+        "type": "Lookup",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.00:10:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "LerSegredoKeyVault",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "source": {
+            "type": "LakehouseTableSource"
+          },
+          "dataset": {
+            "referenceName": "ds_lakehouse_config",
+            "type": "DatasetReference",
+            "parameters": {
+              "tabela": "ingestao_watermark"
+            }
+          },
+          "firstRowOnly": false
+        }
+      },
+      {
+        "name": "FiltrarMarca",
+        "type": "Filter",
+        "dependsOn": [
+          {
+            "activity": "LookupMarca",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "items": {
+            "value": "@activity('LookupMarca').output.value",
+            "type": "Expression"
+          },
+          "condition": {
+            "value": "@equals(item().entidade,pipeline().parameters.entidade)",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "CopiarOrigem",
+        "type": "Switch",
+        "dependsOn": [
+          {
+            "activity": "FiltrarMarca",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "on": {
+            "value": "@pipeline().parameters.origem_tipo",
+            "type": "Expression"
+          },
+          "cases": [
+            {
+              "value": "azure_sql",
+              "activities": [
+                {
+                  "name": "CopySql",
+                  "type": "Copy",
+                  "policy": {
+                    "retry": 3,
+                    "retryIntervalInSeconds": 60,
+                    "timeout": "0.01:00:00",
+                    "secureInput": false,
+                    "secureOutput": false
+                  },
+                  "dependsOn": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "AzureSqlSource",
+                      "sqlReaderQuery": {
+                        "value": "@if(empty(if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,''))),pipeline().parameters.consulta,concat('SELECT * FROM (',pipeline().parameters.consulta,') q WHERE ',pipeline().parameters.coluna_watermark,\" > '\",if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,'')),\"'\"))",
+                        "type": "Expression"
+                      },
+                      "queryTimeout": "02:00:00"
+                    },
+                    "sink": {
+                      "type": "ParquetSink",
+                      "storeSettings": {
+                        "type": "LakehouseWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "ParquetWriteSettings"
+                      }
+                    },
+                    "enableStaging": false
+                  },
+                  "inputs": [
+                    {
+                      "referenceName": "ds_azure_sql",
+                      "type": "DatasetReference"
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "referenceName": "ds_staging_parquet",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "pasta": "@concat('staging/',pipeline().parameters.entidade,'/',pipeline().parameters.run_id)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "value": "arquivo",
+              "activities": [
+                {
+                  "name": "CopyArquivo",
+                  "type": "Copy",
+                  "policy": {
+                    "retry": 3,
+                    "retryIntervalInSeconds": 60,
+                    "timeout": "0.01:00:00",
+                    "secureInput": false,
+                    "secureOutput": false
+                  },
+                  "dependsOn": [],
+                  "typeProperties": {
+                    "source": {
+                      "type": "DelimitedTextSource",
+                      "formatSettings": {
+                        "type": "DelimitedTextReadSettings"
+                      },
+                      "storeSettings": {
+                        "type": "AzureBlobFSReadSettings",
+                        "recursive": true,
+                        "wildcardFileName": {
+                          "value": "@pipeline().parameters.consulta",
+                          "type": "Expression"
+                        }
+                      }
+                    },
+                    "sink": {
+                      "type": "ParquetSink",
+                      "storeSettings": {
+                        "type": "LakehouseWriteSettings"
+                      },
+                      "formatSettings": {
+                        "type": "ParquetWriteSettings"
+                      }
+                    },
+                    "enableStaging": false
+                  },
+                  "inputs": [
+                    {
+                      "referenceName": "ds_arquivos_csv",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "container": "@pipeline().parameters.source_container"
+                      }
+                    }
+                  ],
+                  "outputs": [
+                    {
+                      "referenceName": "ds_staging_parquet",
+                      "type": "DatasetReference",
+                      "parameters": {
+                        "pasta": "@concat('staging/',pipeline().parameters.entidade,'/',pipeline().parameters.run_id)"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "defaultActivities": [
+            {
+              "name": "OrigemInvalida",
+              "type": "Fail",
+              "typeProperties": {
+                "message": "origem_tipo não suportado",
+                "errorCode": "ORIGEM_INVALIDA"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "MergeBronze",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.02:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "CopiarOrigem",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "authentication": {
+            "type": "MSI",
+            "resource": "https://api.fabric.microsoft.com"
+          },
+          "url": "@concat('https://api.fabric.microsoft.com/v1/workspaces/',pipeline().parameters.fabric_workspace_id,'/items/',pipeline().parameters.fabric_merge_pipeline_id,'/jobs/instances?jobType=Pipeline')",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"executionData\":{\"parameters\":{\"entidade\":\"',pipeline().parameters.entidade,'\",\"destino\":\"',pipeline().parameters.destino,'\",\"chave\":\"',pipeline().parameters.chave,'\",\"coluna_watermark\":\"',pipeline().parameters.coluna_watermark,'\",\"origem_tipo\":\"',pipeline().parameters.origem_tipo,'\",\"run_id\":\"',pipeline().parameters.run_id,'\",\"marca_anterior\":\"',if(empty(activity('FiltrarMarca').output.Value),'',coalesce(first(activity('FiltrarMarca').output.Value).ultimo_valor,'')),'\"}}}'))",
+            "type": "Expression"
+          }
+        }
+      }
+    ]
+  }
+}

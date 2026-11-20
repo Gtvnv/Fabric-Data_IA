@@ -1,0 +1,17 @@
+{
+  "name": "ls_object_storage",
+  "properties": {
+    "type": "AzureBlobFS",
+    "typeProperties": {
+      "url": "https://${OBJECT_STORAGE_ACCOUNT}.dfs.core.windows.net",
+      "accountKey": {
+        "type": "AzureKeyVaultSecret",
+        "store": {
+          "referenceName": "ls_key_vault",
+          "type": "LinkedServiceReference"
+        },
+        "secretName": "${KEY_VAULT_SECRET_STORAGE_KEY_NAME}"
+      }
+    }
+  }
+}
