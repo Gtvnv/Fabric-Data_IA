@@ -7,9 +7,10 @@ Requisitos: 3.1, 3.3-3.8, 3.12, 4.1.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 Row = dict[str, Any]
 Key = str | Sequence[str]
@@ -27,7 +28,9 @@ def select_incremental(rows: Iterable[Row], watermark_col: str, last_wm: Any) ->
     """Sem marca persistida -> todos; senão somente ``col > last_wm`` (Req. 3.4)."""
     if last_wm is None:
         return [dict(r) for r in rows]
-    return [\n        dict(r) for r in rows if r.get(watermark_col) is not None and r[watermark_col] > last_wm\n    ]
+    return [
+        dict(r) for r in rows if r.get(watermark_col) is not None and r[watermark_col] > last_wm
+    ]
 
 
 def next_watermark(written_rows: Iterable[Row], watermark_col: str, previous: Any) -> Any:
@@ -39,14 +42,16 @@ def next_watermark(written_rows: Iterable[Row], watermark_col: str, previous: An
     return new if previous is None or new > previous else previous
 
 
-def add_ingestion_metadata(\n    row: Mapping[str, Any], run_id: str, source: str, now_utc: datetime\n) -> Row:
+def add_ingestion_metadata(
+    row: Mapping[str, Any], run_id: str, source: str, now_utc: datetime
+) -> Row:
     """Acrescenta metadados de ingestão sem alterar os valores de origem (Req. 3.3, 4.1)."""
     if not run_id or not source:
         raise ValueError("run_id e source são obrigatórios e não nulos")
     if now_utc.tzinfo is None:
         raise ValueError("now_utc deve ter fuso UTC")
     out = dict(row)
-    out[META_TS] = now_utc.astimezone(timezone.utc)
+    out[META_TS] = now_utc.astimezone(UTC)
     out[META_RUN] = run_id
     out[META_SRC] = source
     return out
@@ -108,6 +113,12 @@ class RunStatus:
     @property
     def ok(self) -> bool:
         return self.status == STATUS_SUCCESS
+
+
+def _entity_name(ent: Any) -> str:
+    if isinstance(ent, Mapping):
+        return str(ent.get("entidade", ent))
+    return ent if isinstance(ent, str) else str(getattr(ent, "name", ent))
 
 
 def _entity_name(ent: Any) -> str:
