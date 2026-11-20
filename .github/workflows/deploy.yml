@@ -1,0 +1,91 @@
+name: Deploy
+
+# Executa após o merge na branch base: test (automático) e prod (aprovação manual).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write # OIDC com o Azure
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-test:
+    name: Deploy test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: test
+    env:
+      DEPLOY_REPORT_PATH: ${{ runner.temp }}/deploy-report.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Azure login (OIDC, service principal de mínimo privilégio)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_TEST }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Deploy test
+        run: |
+          TOKEN="$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)"
+          echo "::add-mask::$TOKEN"
+          export FABRIC_TOKEN="$TOKEN"
+          python -m infra.deploy deploy --env test
+
+      - name: Notify failure (test)
+        if: failure()
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: python -m infra.deploy notify --env test
+
+  deploy-prod:
+    name: Deploy prod
+    needs: deploy-test # falha em test impede o deploy em prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # O environment "prod" deve ter required reviewers (>= 1 aprovador).
+    environment: prod
+    env:
+      DEPLOY_REPORT_PATH: ${{ runner.temp }}/deploy-report.json
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Azure login (OIDC, service principal de mínimo privilégio)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID_PROD }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Deploy prod
+        run: |
+          TOKEN="$(az account get-access-token --resource https://api.fabric.microsoft.com --query accessToken -o tsv)"
+          echo "::add-mask::$TOKEN"
+          export FABRIC_TOKEN="$TOKEN"
+          python -m infra.deploy deploy --env prod
+
+      - name: Notify failure (prod)
+        if: failure()
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+        run: python -m infra.deploy notify --env prod
