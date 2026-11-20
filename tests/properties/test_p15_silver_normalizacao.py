@@ -10,13 +10,11 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 
+import hypothesis.strategies as st
 from hypothesis import given, settings
 
 from platform_lib.silver import META_TS, to_silver
-
 from tests.strategies_silver_norm import SPEC_LOWER, SPEC_UPPER, bronze_batches
-
-import hypothesis.strategies as st
 
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

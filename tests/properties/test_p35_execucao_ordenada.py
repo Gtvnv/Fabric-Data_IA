@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from hypothesis import given, settings
-
 from src.platform_lib.orchestration import (
     STATUS_FAILED,
     STATUS_NOT_RUN,
@@ -11,6 +10,7 @@ from src.platform_lib.orchestration import (
     STEPS,
     run_pipeline,
 )
+
 from tests.strategies_orch_order import step_outcomes
 
 

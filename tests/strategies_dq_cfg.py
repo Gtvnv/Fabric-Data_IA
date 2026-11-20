@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
-
 from src.platform_lib.dq import RULE_TYPES, SEVERITIES
 
 _ident = st.text(alphabet="abcdefghijklmnopqrstuvwxyz_", min_size=1, max_size=10)

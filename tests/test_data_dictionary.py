@@ -3,8 +3,15 @@ from __future__ import annotations
 
 import csv
 
-from infra.gen_data_dictionary import DEFAULT_CSV_PATH, DEFAULT_MD_PATH, main, render_csv, render_markdown
+from infra.gen_data_dictionary import (
+    DEFAULT_CSV_PATH,
+    DEFAULT_MD_PATH,
+    main,
+    render_csv,
+    render_markdown,
+)
 from infra.gen_gold_ddl import load_schema
+
 from platform_lib.docs_tools import validate_data_dictionary
 
 

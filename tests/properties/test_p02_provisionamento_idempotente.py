@@ -8,8 +8,8 @@ from __future__ import annotations
 from collections import Counter
 
 from hypothesis import given, settings
-
 from infra.provision import FakeFabricClient, apply, plan
+
 from tests.strategies_prov_idem import desired_and_existing
 
 

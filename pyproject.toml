@@ -50,3 +50,8 @@ src = ["src", "tests", "infra"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+# Linhas longas sao docstrings/strings em portugues; nao afetam comportamento.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B905", "E731", "E741"]

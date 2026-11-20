@@ -20,7 +20,6 @@ from platform_lib.gold import (
     resolve_fact,
 )
 from platform_lib.silver import to_silver
-
 from tests.strategies_idem import SPEC_VENDA, bronze_vendas, scd2_case, silver_dims
 
 

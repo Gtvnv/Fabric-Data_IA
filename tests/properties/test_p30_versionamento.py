@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from platform_lib.ml.registry import next_model_version, register_if_valid
 
+from platform_lib.ml.registry import next_model_version, register_if_valid
 from tests.strategies_ml_version import (
     existing_versions,
     model_kinds,

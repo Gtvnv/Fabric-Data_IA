@@ -6,7 +6,7 @@ Silver, vendas e uma dimensão cliente SCD2 com entrada e ``as_of`` compatíveis
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -31,7 +31,7 @@ SPEC_VENDA = EntitySpec(
     non_negative=("valor_venda",),
 )
 
-_BASE_TS = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_BASE_TS = datetime(2024, 1, 1, tzinfo=UTC)
 _ids = st.sampled_from(["A", "B", "C", "D", "E"])
 _pad = st.sampled_from(["", " ", "  "])
 _dates = st.dates(min_value=date(2023, 1, 1), max_value=date(2024, 12, 31))

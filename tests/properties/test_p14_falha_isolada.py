@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 from hypothesis import given, settings
-
 from src.platform_lib.ingestion import STATUS_FAILURE, STATUS_SUCCESS, run_entities
+
 from tests.strategies_ingest_entities import entities_with_failures
 
 

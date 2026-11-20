@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
-
 from infra.provision import DesiredItem, desired_state
 
 _ENVS = ["dev", "test", "prod"]

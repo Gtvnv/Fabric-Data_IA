@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from hypothesis import given, settings
-
 from src.platform_lib.secrets_scan import STATUS_OK, decide_scan
+
 from tests.strategies_scan import finding_lists, scan_results
-from hypothesis import strategies as st
 
 
 @settings(max_examples=100)

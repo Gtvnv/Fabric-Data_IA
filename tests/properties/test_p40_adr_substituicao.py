@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from platform_lib.docs_tools import supersede_adr
 from tests.strategies_adr_supersede import adr_numbers, adr_texts, distinct_adr_pairs

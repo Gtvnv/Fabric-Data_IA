@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
-
 from src.platform_lib.orchestration import STEPS
 
 # Por etapa: inteiro 0..1000 = sucesso com esse número de registros; "fail" = falha.

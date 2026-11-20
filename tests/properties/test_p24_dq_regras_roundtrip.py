@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 import yaml
 from hypothesis import given, settings
-
 from src.platform_lib.dq import Rule, RulesConfigError, load_rules
+
 from tests.strategies_dq_cfg import invalid_rule_sets, valid_rule_sets
 
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from hypothesis import given, settings
-
 from src.platform_lib.ingestion import run_with_retry
 from src.platform_lib.orchestration import StepRecord, notify_failure
+
 from tests.strategies_retry import error_messages, failures_before_success
 
 

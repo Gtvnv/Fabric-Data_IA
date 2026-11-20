@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import string
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from hypothesis import strategies as st
 
 from platform_lib.silver import META_TS, T_DATE, T_DECIMAL, T_INT, T_STR, EntitySpec
-
 from tests.strategies import dates, money
 
 SPEC_UPPER = EntitySpec(
@@ -31,7 +30,7 @@ SPEC_LOWER = EntitySpec(
     text_case="lower",
 )
 
-_BASE_TS = datetime(2024, 1, 1, tzinfo=timezone.utc)
+_BASE_TS = datetime(2024, 1, 1, tzinfo=UTC)
 
 _alnum = string.ascii_letters + string.digits
 _ws = st.text(alphabet=" \t", max_size=3)

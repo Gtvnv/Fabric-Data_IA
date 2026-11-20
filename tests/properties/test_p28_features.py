@@ -5,7 +5,12 @@ from datetime import date
 
 from hypothesis import given, settings
 
-from platform_lib.ml.features import PII_COLUMNS, build_churn_features, build_demand_features, drop_direct_pii
+from platform_lib.ml.features import (
+    PII_COLUMNS,
+    build_churn_features,
+    build_demand_features,
+    drop_direct_pii,
+)
 from tests.strategies_ml_features import gold_data, ref_dates, rows_with_pii
 
 DIRECT_PII = {"nome", "cpf", "email", "telefone", "endereco"}

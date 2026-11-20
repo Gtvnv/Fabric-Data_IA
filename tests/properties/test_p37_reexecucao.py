@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from src.platform_lib.orchestration import (
     STATUS_FAILED,
     STATUS_NOT_RUN,
@@ -14,6 +13,7 @@ from src.platform_lib.orchestration import (
     resume_point,
     run_pipeline,
 )
+
 from tests.strategies_orch_resume import (
     failed_index,
     non_success_status,

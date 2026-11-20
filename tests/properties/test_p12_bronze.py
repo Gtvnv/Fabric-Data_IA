@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
-
 from src.platform_lib.ingestion import (
     META_RUN,
     META_SRC,
@@ -13,6 +12,7 @@ from src.platform_lib.ingestion import (
     ingest_entity,
     merge_bronze,
 )
+
 from tests.strategies_ingest_bronze import now_values, run_ids, source_rows, source_systems
 
 META = {META_TS, META_RUN, META_SRC}

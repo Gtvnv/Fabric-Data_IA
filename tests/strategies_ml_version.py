@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
+
 from platform_lib.ml.registry import CHURN, DEMAND, REQUIRED_METRICS
 
 # Versões existentes: lista possivelmente vazia, com repetições e fora de ordem.

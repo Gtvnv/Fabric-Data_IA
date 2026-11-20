@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
-
 from src.platform_lib.orchestration import STEPS
 
 failed_index = st.integers(min_value=0, max_value=len(STEPS) - 1)

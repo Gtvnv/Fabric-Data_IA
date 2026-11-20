@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from hypothesis import strategies as st
-
 from src.platform_lib.secrets_scan import (
     STATUS_ERROR,
     STATUS_OK,
