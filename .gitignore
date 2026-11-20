@@ -1,0 +1,22 @@
+# Segredos e credenciais
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*credentials*.json
+*service-account*.json
+
+# Dados gerados
+data/generated/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Testes
+.hypothesis/
+.pytest_cache/
+.ruff_cache/
