@@ -1,0 +1,45 @@
+table dim_loja
+	lineageTag: da323314-7fb9-5a72-b93e-4f1bf943f68c
+
+	column sk_loja
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_loja
+
+	column loja_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: loja_id
+
+	column nome
+		dataType: string
+		sourceColumn: nome
+
+	column regiao
+		dataType: string
+		sourceColumn: regiao
+
+	column cidade
+		dataType: string
+		sourceColumn: cidade
+
+	column uf
+		dataType: string
+		sourceColumn: uf
+
+	hierarchy Loja
+		level Regiao
+			column: regiao
+		level Loja
+			column: nome
+
+	partition dim_loja = entity
+		mode: directLake
+		source
+			entityName: dim_loja
+			schemaName: dbo
+			expressionSource: DatabaseQuery

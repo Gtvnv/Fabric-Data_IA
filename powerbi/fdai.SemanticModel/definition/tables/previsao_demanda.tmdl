@@ -1,0 +1,46 @@
+table previsao_demanda
+	lineageTag: d17b8993-cab2-58c5-824c-30fc9449a0f6
+
+	column sk_produto
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_produto
+
+	column sk_loja
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_loja
+
+	column data
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		sourceColumn: data
+
+	column previsao
+		dataType: double
+		summarizeBy: none
+		sourceColumn: previsao
+
+	column modelo
+		dataType: string
+		sourceColumn: modelo
+
+	column versao_modelo
+		dataType: string
+		sourceColumn: versao_modelo
+
+	column pontuado_em_utc
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		sourceColumn: pontuado_em_utc
+
+	partition previsao_demanda = entity
+		mode: directLake
+		source
+			entityName: previsao_demanda
+			schemaName: dbo
+			expressionSource: DatabaseQuery

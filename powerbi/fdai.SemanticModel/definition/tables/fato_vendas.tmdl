@@ -1,0 +1,78 @@
+table fato_vendas
+	lineageTag: a983d5f3-fb8f-526f-9056-9cf14e6645c0
+
+	column venda_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: venda_id
+
+	column sk_cliente
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_cliente
+
+	column sk_produto
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_produto
+
+	column sk_loja
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_loja
+
+	column sk_data
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_data
+
+	column quantidade
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: quantidade
+
+	column valor_venda
+		dataType: decimal
+		summarizeBy: none
+		sourceColumn: valor_venda
+
+	column custo_total
+		dataType: decimal
+		summarizeBy: none
+		sourceColumn: custo_total
+
+	measure 'Receita Total' = SUM(fato_vendas[valor_venda])
+		formatString: "R$ #,0.00"
+
+	measure Quantidade = SUM(fato_vendas[quantidade])
+		formatString: #,0
+
+	measure Margem = [Receita Total] - SUM(fato_vendas[custo_total])
+		formatString: "R$ #,0.00"
+
+	measure 'Ticket Medio' = DIVIDE([Receita Total], DISTINCTCOUNT(fato_vendas[venda_id]))
+		formatString: "R$ #,0.00"
+
+	measure 'Receita Total LY' = CALCULATE([Receita Total], SAMEPERIODLASTYEAR(dim_calendario[data]))
+		formatString: "R$ #,0.00"
+
+	measure 'Variacao YoY' = DIVIDE([Receita Total] - [Receita Total LY], [Receita Total LY])
+		formatString: 0.00%
+
+	partition fato_vendas = entity
+		mode: directLake
+		source
+			entityName: fato_vendas
+			schemaName: dbo
+			expressionSource: DatabaseQuery

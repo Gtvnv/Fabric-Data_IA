@@ -1,0 +1,46 @@
+table agg_vendas_dia
+	lineageTag: cf1e9bec-56bb-5825-bef9-ebc8901ba106
+
+	column sk_data
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_data
+
+	column sk_produto
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_produto
+
+	column sk_loja
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_loja
+
+	column quantidade
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: quantidade
+
+	column valor_venda
+		dataType: decimal
+		summarizeBy: none
+		sourceColumn: valor_venda
+
+	column custo_total
+		dataType: decimal
+		summarizeBy: none
+		sourceColumn: custo_total
+
+	partition agg_vendas_dia = entity
+		mode: directLake
+		source
+			entityName: agg_vendas_dia
+			schemaName: dbo
+			expressionSource: DatabaseQuery

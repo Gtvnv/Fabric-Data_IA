@@ -1,0 +1,48 @@
+table dim_produto
+	lineageTag: a8a6fcaa-2892-53dd-a1b9-e7a0d1821479
+
+	column sk_produto
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: sk_produto
+
+	column produto_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: produto_id
+
+	column nome
+		dataType: string
+		sourceColumn: nome
+
+	column categoria
+		dataType: string
+		sourceColumn: categoria
+
+	column subcategoria
+		dataType: string
+		sourceColumn: subcategoria
+
+	column preco_lista
+		dataType: decimal
+		summarizeBy: none
+		sourceColumn: preco_lista
+
+	hierarchy Produto
+		level Categoria
+			column: categoria
+		level Subcategoria
+			column: subcategoria
+		level Produto
+			column: nome
+
+	partition dim_produto = entity
+		mode: directLake
+		source
+			entityName: dim_produto
+			schemaName: dbo
+			expressionSource: DatabaseQuery

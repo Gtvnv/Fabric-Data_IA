@@ -1,0 +1,51 @@
+relationship fato_vendas_sk_produto_dim_produto_sk_produto
+	fromColumn: fato_vendas.sk_produto
+	toColumn: dim_produto.sk_produto
+
+relationship fato_vendas_sk_loja_dim_loja_sk_loja
+	fromColumn: fato_vendas.sk_loja
+	toColumn: dim_loja.sk_loja
+
+relationship fato_vendas_sk_data_dim_calendario_sk_data
+	fromColumn: fato_vendas.sk_data
+	toColumn: dim_calendario.sk_data
+
+relationship agg_vendas_dia_sk_produto_dim_produto_sk_produto
+	fromColumn: agg_vendas_dia.sk_produto
+	toColumn: dim_produto.sk_produto
+
+relationship agg_vendas_dia_sk_loja_dim_loja_sk_loja
+	fromColumn: agg_vendas_dia.sk_loja
+	toColumn: dim_loja.sk_loja
+
+relationship agg_vendas_dia_sk_data_dim_calendario_sk_data
+	fromColumn: agg_vendas_dia.sk_data
+	toColumn: dim_calendario.sk_data
+
+relationship estoque_sk_produto_dim_produto_sk_produto
+	fromColumn: estoque.sk_produto
+	toColumn: dim_produto.sk_produto
+
+relationship estoque_sk_loja_dim_loja_sk_loja
+	fromColumn: estoque.sk_loja
+	toColumn: dim_loja.sk_loja
+
+relationship estoque_sk_data_dim_calendario_sk_data
+	fromColumn: estoque.sk_data
+	toColumn: dim_calendario.sk_data
+
+relationship fato_vendas_sk_cliente_dim_cliente_sk_cliente
+	fromColumn: fato_vendas.sk_cliente
+	toColumn: dim_cliente.sk_cliente
+
+relationship previsao_demanda_sk_produto_dim_produto_sk_produto
+	fromColumn: previsao_demanda.sk_produto
+	toColumn: dim_produto.sk_produto
+
+relationship previsao_demanda_sk_loja_dim_loja_sk_loja
+	fromColumn: previsao_demanda.sk_loja
+	toColumn: dim_loja.sk_loja
+
+relationship previsao_churn_sk_cliente_dim_cliente_sk_cliente
+	fromColumn: previsao_churn.sk_cliente
+	toColumn: dim_cliente.sk_cliente

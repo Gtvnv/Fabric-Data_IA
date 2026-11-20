@@ -1,0 +1,18 @@
+table ultima_atualizacao
+	lineageTag: 44f10223-056e-573f-a446-755d01bb8ec7
+
+	column ts_utc
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		sourceColumn: ts_utc
+
+	column ts_sao_paulo_texto
+		dataType: string
+		sourceColumn: ts_sao_paulo_texto
+
+	partition ultima_atualizacao = entity
+		mode: directLake
+		source
+			entityName: ultima_atualizacao
+			schemaName: config
+			expressionSource: DatabaseQuery

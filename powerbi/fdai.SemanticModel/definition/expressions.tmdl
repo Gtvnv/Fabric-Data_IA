@@ -1,0 +1,8 @@
+expression DatabaseQuery =
+		let
+			database = Sql.Database("<sql-endpoint-do-lakehouse-gold>", "<nome-do-lakehouse-gold>")
+		in
+			database
+	lineageTag: c26b4f79-896d-55fd-82d2-11214427f3b0
+
+	annotation PBI_IncludeFutureArtifacts = False

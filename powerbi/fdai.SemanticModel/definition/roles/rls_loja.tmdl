@@ -1,0 +1,4 @@
+role rls_loja
+	modelPermission: read
+
+	tablePermission dim_loja = dim_loja[loja_id] IN SELECTCOLUMNS(FILTER(usuario_loja, usuario_loja[usuario] = USERPRINCIPALNAME()), "loja_id", usuario_loja[loja_id])

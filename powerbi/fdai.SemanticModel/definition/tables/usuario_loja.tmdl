@@ -1,0 +1,21 @@
+table usuario_loja
+	lineageTag: 2dd83241-2713-5bdd-8a9c-c0a1a70d7928
+
+	column usuario
+		dataType: string
+		isHidden
+		sourceColumn: usuario
+
+	column loja_id
+		dataType: int64
+		formatString: 0
+		isHidden
+		summarizeBy: none
+		sourceColumn: loja_id
+
+	partition usuario_loja = entity
+		mode: directLake
+		source
+			entityName: usuario_loja
+			schemaName: seguranca
+			expressionSource: DatabaseQuery
