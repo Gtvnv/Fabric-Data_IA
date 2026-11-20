@@ -175,14 +175,16 @@ def evaluate_all(
 
 
 def decide_promotion(results: Iterable[RuleResult]) -> Decision:
-    """Bloqueia se alguma regra blocking tem violações >= 1; alertas só registram (Req. 5.2, 5.3)."""
+    """Bloqueia se alguma regra blocking tem violações >= 1; alertas só registram (5.2, 5.3)."""
     failed = tuple(
         (r.rule, r.table) for r in results if r.severity == "blocking" and r.violations >= 1
     )
     return Decision(promote=not failed, failed_rules=failed)
 
 
-def persist_results(results: Iterable[RuleResult], sink: ResultSink, run_id: str | None = None) -> None:
+def persist_results(
+    results: Iterable[RuleResult], sink: ResultSink, run_id: str | None = None
+) -> None:
     """Grava 1 linha por regra avaliada, inclusive com 0 violações (Req. 5.4, 5.5)."""
     rows: list[Row] = [
         {
