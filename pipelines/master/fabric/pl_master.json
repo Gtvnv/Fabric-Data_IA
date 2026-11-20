@@ -1,0 +1,1051 @@
+{
+  "properties": {
+    "concurrency": 1,
+    "parameters": {
+      "original_run_id": {
+        "type": "string",
+        "defaultValue": ""
+      },
+      "kv_secret_sql": {
+        "type": "string",
+        "defaultValue": "${KEY_VAULT_SECRET_SQL_PASSWORD_NAME}"
+      },
+      "kv_secret_storage": {
+        "type": "string",
+        "defaultValue": "${KEY_VAULT_SECRET_STORAGE_KEY_NAME}"
+      },
+      "kv_uri": {
+        "type": "string",
+        "defaultValue": "${KEY_VAULT_URI}"
+      },
+      "source_container": {
+        "type": "string",
+        "defaultValue": "${OBJECT_STORAGE_CONTAINER}"
+      }
+    },
+    "activities": [
+      {
+        "name": "VerificarExecucaoAtiva",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "Query",
+              "text": {
+                "value": "SELECT COUNT(*) AS ativas FROM audit.execucoes WHERE status = N'em andamento' AND run_id <> '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "ValidarConcorrencia",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "VerificarExecucaoAtiva",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@greater(int(activity('VerificarExecucaoAtiva').output.resultSets[0].rows[0].ativas),0)",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "FalharExecucaoAtiva",
+              "type": "Fail",
+              "typeProperties": {
+                "message": "Já existe uma execução do pipeline mestre em andamento; nova execução não iniciada",
+                "errorCode": "EXECUCAO_EM_ANDAMENTO"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RegistrarInicioExecucao",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "ValidarConcorrencia",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes (run_id, run_original_id, inicio, fim, status) VALUES ('@{pipeline().RunId}', NULLIF('@{pipeline().parameters.original_run_id}',''), SYSUTCDATETIME(), NULL, N'em andamento')",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "ingestao",
+        "type": "InvokePipeline",
+        "dependsOn": [
+          {
+            "activity": "RegistrarInicioExecucao",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "pipelineId": "${PIPELINE_INGESTAO_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}",
+          "waitOnCompletion": true,
+          "parameters": {
+            "kv_secret_sql": {
+              "value": "@pipeline().parameters.kv_secret_sql",
+              "type": "Expression"
+            },
+            "kv_secret_storage": {
+              "value": "@pipeline().parameters.kv_secret_storage",
+              "type": "Expression"
+            },
+            "kv_uri": {
+              "value": "@pipeline().parameters.kv_uri",
+              "type": "Expression"
+            },
+            "source_container": {
+              "value": "@pipeline().parameters.source_container",
+              "type": "Expression"
+            },
+            "run_id": {
+              "value": "@pipeline().RunId",
+              "type": "Expression"
+            }
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_INVOKE_PIPELINE}"
+        }
+      },
+      {
+        "name": "RegistrarSucesso_ingestao",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "ingestao",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ingestao', '@{formatDateTime(activity('ingestao').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('ingestao').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('ingestao').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_ingestao",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "ingestao",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ingestao', '@{formatDateTime(activity('ingestao').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('ingestao').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'silver', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'qualidade', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'gold', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', NULL, NULL, N'não executada', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_ingestao",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_ingestao",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"ingestao\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''ingestao'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_ingestao",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_ingestao",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa ingestao [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "silver",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.04:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_ingestao",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_SILVER_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}"
+        }
+      },
+      {
+        "name": "RegistrarSucesso_silver",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "silver",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'silver', '@{formatDateTime(activity('silver').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('silver').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('silver').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_silver",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "silver",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'silver', '@{formatDateTime(activity('silver').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('silver').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'qualidade', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'gold', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', NULL, NULL, N'não executada', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_silver",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_silver",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"silver\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''silver'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_silver",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_silver",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa silver [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "qualidade",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.04:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_silver",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_QUALIDADE_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}"
+        }
+      },
+      {
+        "name": "RegistrarSucesso_qualidade",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "qualidade",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'qualidade', '@{formatDateTime(activity('qualidade').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('qualidade').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('qualidade').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_qualidade",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "qualidade",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'qualidade', '@{formatDateTime(activity('qualidade').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('qualidade').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'gold', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', NULL, NULL, N'não executada', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_qualidade",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_qualidade",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"qualidade\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''qualidade'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_qualidade",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_qualidade",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa qualidade [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "gold",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.04:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_qualidade",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_GOLD_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}"
+        }
+      },
+      {
+        "name": "RegistrarSucesso_gold",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "gold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'gold', '@{formatDateTime(activity('gold').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('gold').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('gold').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_gold",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "gold",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'gold', '@{formatDateTime(activity('gold').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('gold').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', NULL, NULL, N'não executada', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', NULL, NULL, N'não executada', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_gold",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_gold",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"gold\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''gold'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_gold",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_gold",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa gold [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "ia",
+        "type": "IfCondition",
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_gold",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "expression": {
+            "value": "@true",
+            "type": "Expression"
+          },
+          "ifTrueActivities": [
+            {
+              "name": "ia_features",
+              "type": "TridentNotebook",
+              "policy": {
+                "retry": 0,
+                "timeout": "0.04:00:00"
+              },
+              "dependsOn": [],
+              "typeProperties": {
+                "notebookId": "${NOTEBOOK_FEATURES_ID}",
+                "workspaceId": "${FABRIC_WORKSPACE_ID}"
+              }
+            },
+            {
+              "name": "ia_treino_churn",
+              "type": "TridentNotebook",
+              "policy": {
+                "retry": 0,
+                "timeout": "0.04:00:00"
+              },
+              "dependsOn": [
+                {
+                  "activity": "ia_features",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "notebookId": "${NOTEBOOK_TREINO_CHURN_ID}",
+                "workspaceId": "${FABRIC_WORKSPACE_ID}"
+              }
+            },
+            {
+              "name": "ia_treino_demanda",
+              "type": "TridentNotebook",
+              "policy": {
+                "retry": 0,
+                "timeout": "0.04:00:00"
+              },
+              "dependsOn": [
+                {
+                  "activity": "ia_treino_churn",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "notebookId": "${NOTEBOOK_TREINO_DEMANDA_ID}",
+                "workspaceId": "${FABRIC_WORKSPACE_ID}"
+              }
+            },
+            {
+              "name": "ia_pontuacao",
+              "type": "TridentNotebook",
+              "policy": {
+                "retry": 0,
+                "timeout": "0.04:00:00"
+              },
+              "dependsOn": [
+                {
+                  "activity": "ia_treino_demanda",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ],
+              "typeProperties": {
+                "notebookId": "${NOTEBOOK_PONTUACAO_ID}",
+                "workspaceId": "${FABRIC_WORKSPACE_ID}"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "RegistrarSucesso_ia",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "ia",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', '@{formatDateTime(activity('ia').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('ia').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('ia').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_ia",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "ia",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'ia', '@{formatDateTime(activity('ia').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('ia').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', NULL, NULL, N'não executada', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_ia",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_ia",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"ia\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''ia'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_ia",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_ia",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa ia [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "semantico",
+        "type": "InvokePipeline",
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_ia",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "pipelineId": "${PIPELINE_SEMANTICO_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}",
+          "waitOnCompletion": true,
+          "parameters": {}
+        },
+        "externalReferences": {
+          "connection": "${CONN_INVOKE_PIPELINE}"
+        }
+      },
+      {
+        "name": "RegistrarSucesso_semantico",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "semantico",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', '@{formatDateTime(activity('semantico').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('semantico').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'sucesso', @{int(coalesce(json(coalesce(activity('semantico').output?.result?.exitValue,'{}'))?['registros'],0))})",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "RegistrarFalha_semantico",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "semantico",
+            "dependencyConditions": [
+              "Failed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "INSERT INTO audit.execucoes_etapas (run_id, etapa, inicio, fim, status, registros) VALUES ('@{pipeline().RunId}', N'semantico', '@{formatDateTime(activity('semantico').ExecutionStartTime,'yyyy-MM-ddTHH:mm:ss.fff')}', '@{formatDateTime(activity('semantico').ExecutionEndTime,'yyyy-MM-ddTHH:mm:ss.fff')}', N'falha', 0); UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'falha' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      },
+      {
+        "name": "Notificar_semantico",
+        "type": "WebActivity",
+        "policy": {
+          "retry": 3,
+          "retryIntervalInSeconds": 60,
+          "timeout": "0.00:00:20"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarFalha_semantico",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "method": "POST",
+          "relativeUrl": "",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "value": "@json(concat('{\"etapa\":\"semantico\",\"run_id\":\"', pipeline().RunId, '\",\"text\":\"Pipeline mestre falhou na etapa ''semantico'' [execução ', pipeline().RunId, ']\"}'))",
+            "type": "Expression"
+          }
+        },
+        "externalReferences": {
+          "connection": "${CONN_ALERT_WEBHOOK}"
+        }
+      },
+      {
+        "name": "Falhar_semantico",
+        "type": "Fail",
+        "dependsOn": [
+          {
+            "activity": "Notificar_semantico",
+            "dependencyConditions": [
+              "Completed"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "message": {
+            "value": "@concat('Pipeline mestre falhou na etapa semantico [execução ', pipeline().RunId, ']')",
+            "type": "Expression"
+          },
+          "errorCode": "ETAPA_FALHOU"
+        }
+      },
+      {
+        "name": "AtualizarUltimaAtualizacao",
+        "type": "TridentNotebook",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.04:00:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "RegistrarSucesso_semantico",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "notebookId": "${NOTEBOOK_ULTIMA_ATUALIZACAO_ID}",
+          "workspaceId": "${FABRIC_WORKSPACE_ID}"
+        }
+      },
+      {
+        "name": "FinalizarExecucao",
+        "type": "Script",
+        "policy": {
+          "retry": 2,
+          "retryIntervalInSeconds": 10,
+          "timeout": "0.00:01:00"
+        },
+        "dependsOn": [
+          {
+            "activity": "AtualizarUltimaAtualizacao",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ],
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "NonQuery",
+              "text": {
+                "value": "UPDATE audit.execucoes SET fim = SYSUTCDATETIME(), status = N'sucesso' WHERE run_id = '@{pipeline().RunId}'",
+                "type": "Expression"
+              }
+            }
+          ]
+        },
+        "externalReferences": {
+          "connection": "${CONN_WAREHOUSE_AUDIT}"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "name": "AtualizarModeloSemantico",
+        "type": "PBISemanticModelRefresh",
+        "policy": {
+          "retry": 0,
+          "timeout": "0.01:00:00"
+        },
+        "dependsOn": [],
+        "typeProperties": {
+          "method": "post",
+          "groupId": "${FABRIC_WORKSPACE_ID}",
+          "datasetId": "${SEMANTIC_MODEL_ID}",
+          "waitOnCompletion": true,
+          "operationType": "SemanticModelRefresh"
+        },
+        "externalReferences": {
+          "connection": "${CONN_SEMANTIC_REFRESH}"
+        }
+      }
+    ]
+  }
+}
