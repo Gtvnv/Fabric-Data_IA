@@ -1,0 +1,50 @@
+{
+  "descricao": "Matriz de funções (Req. 6.6): função da plataforma -> função de workspace Fabric -> grupo Entra ID. Permissões mínimas.",
+  "papeis": [
+    {
+      "funcao": "administrador",
+      "workspace_role": "Admin",
+      "grupo_entra_id": "${ENTRA_GROUP_ADMINISTRADOR_ID}",
+      "sql_role": "rl_administrador",
+      "unmask": true,
+      "permissoes": [
+        "Gerenciar workspace, capacidade e acessos",
+        "Ler dados mascarados sem máscara (UNMASK)",
+        "Gerenciar catálogo de governança e Purview"
+      ]
+    },
+    {
+      "funcao": "engenheiro",
+      "workspace_role": "Member",
+      "grupo_entra_id": "${ENTRA_GROUP_ENGENHEIRO_ID}",
+      "sql_role": "rl_engenheiro",
+      "unmask": false,
+      "permissoes": [
+        "Criar e editar pipelines, notebooks, Lakehouse e Warehouse",
+        "Executar pipelines e consultar tabelas (dados confidenciais mascarados)"
+      ]
+    },
+    {
+      "funcao": "analista",
+      "workspace_role": "Contributor",
+      "grupo_entra_id": "${ENTRA_GROUP_ANALISTA_ID}",
+      "sql_role": "rl_analista",
+      "unmask": false,
+      "permissoes": [
+        "Criar relatórios e consultas sobre o Gold",
+        "Sem alteração de pipelines de produção; dados confidenciais mascarados"
+      ]
+    },
+    {
+      "funcao": "consumidor",
+      "workspace_role": "Viewer",
+      "grupo_entra_id": "${ENTRA_GROUP_CONSUMIDOR_ID}",
+      "sql_role": "rl_consumidor",
+      "unmask": false,
+      "permissoes": [
+        "Somente leitura de relatórios, filtrada por RLS (seguranca.usuario_loja)",
+        "Dados confidenciais mascarados"
+      ]
+    }
+  ]
+}

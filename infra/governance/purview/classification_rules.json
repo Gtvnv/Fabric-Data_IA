@@ -1,0 +1,32 @@
+{
+  "descricao": "Regras de classificação de dados pessoais (Req. 6.3). Espelham platform_lib.governance.",
+  "conjunto": "regras-classificacao-pessoal",
+  "sensitivity_label": "dado_pessoal",
+  "regras": [
+    {
+      "nome": "pessoal-nome",
+      "categoria": "nome",
+      "padrao_coluna": "(^|_)(nome|name)(_|$)",
+      "padrao_dados": null
+    },
+    {
+      "nome": "pessoal-email",
+      "categoria": "email",
+      "padrao_coluna": "(^|_)(e_?mail|email)(_|$)",
+      "padrao_dados": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    {
+      "nome": "pessoal-documento",
+      "categoria": "documento",
+      "padrao_coluna": "(^|_)(cpf|cnpj|rg|documento|doc)(_|$)",
+      "padrao_dados": "^(\\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}|\\d{2}\\.?\\d{3}\\.?\\d{3}/?\\d{4}-?\\d{2})$"
+    },
+    {
+      "nome": "pessoal-telefone",
+      "categoria": "telefone",
+      "padrao_coluna": "(^|_)(telefone|fone|celular|phone|tel)(_|$)",
+      "padrao_dados": "^(\\+?55\\s?)?(\\(?\\d{2}\\)?\\s?)?9?\\d{4}-?\\d{4}$"
+    }
+  ],
+  "limiar_correspondencia_dados": 0.8
+}

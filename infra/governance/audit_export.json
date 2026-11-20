@@ -1,0 +1,30 @@
+{
+  "descricao": "Exportação do log de auditoria do Fabric/Purview para tabela consultável (Req. 6.7)",
+  "fontes": [
+    {"origem": "fabric_activity_events", "api": "admin/activityevents"},
+    {"origem": "purview_audit", "endpoint": "${PURVIEW_ENDPOINT}"}
+  ],
+  "destino": {
+    "tabela": "governanca.auditoria_acesso",
+    "view_acessos_negados": "governanca.vw_acessos_negados",
+    "ddl": "audit_log.sql"
+  },
+  "agenda": {
+    "intervalo_minutos": 5,
+    "latencia_maxima_minutos": 5
+  },
+  "filtro_acesso_negado": {
+    "resultados": ["Denied", "Forbidden", "Unauthorized", "Failed"],
+    "campo_resultado": "resultado",
+    "marcar_coluna": "acesso_negado"
+  },
+  "mapeamento": {
+    "evento_id": "Id",
+    "ocorrido_em_utc": "CreationTime",
+    "usuario": "UserId",
+    "operacao": "Operation",
+    "item": "ItemName",
+    "resultado": "ResultStatus"
+  },
+  "idempotencia": {"chave": "evento_id"}
+}

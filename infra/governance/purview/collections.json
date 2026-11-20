@@ -1,0 +1,10 @@
+{
+  "descricao": "Coleções do Purview por ambiente (Req. 6.2)",
+  "raiz": "${PURVIEW_COLLECTION_ROOT}",
+  "colecoes": [
+    {"nome": "dev", "nome_exibicao": "Fabric Dados IA - dev", "pai": "${PURVIEW_COLLECTION_ROOT}", "ambiente": "dev"},
+    {"nome": "test", "nome_exibicao": "Fabric Dados IA - test", "pai": "${PURVIEW_COLLECTION_ROOT}", "ambiente": "test"},
+    {"nome": "prod", "nome_exibicao": "Fabric Dados IA - prod", "pai": "${PURVIEW_COLLECTION_ROOT}", "ambiente": "prod"}
+  ],
+  "selecao": {"variavel_ambiente": "FABRIC_ENV", "colecao_ativa": "${PURVIEW_COLLECTION_NAME}"}
+}

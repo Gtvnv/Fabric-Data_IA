@@ -1,0 +1,28 @@
+{
+  "descricao": "Varredura do workspace Fabric no Purview (Req. 6.1, 6.2)",
+  "conta": "${PURVIEW_ACCOUNT_NAME}",
+  "endpoint": "${PURVIEW_ENDPOINT}",
+  "fonte": {
+    "kind": "Fabric",
+    "workspace_id": "${FABRIC_WORKSPACE_ID}",
+    "tenant_id": "${FABRIC_TENANT_ID}"
+  },
+  "scan": {
+    "nome": "scan-fabric-diario",
+    "credencial": {"tipo": "ServicePrincipal", "client_id": "${FABRIC_CLIENT_ID}", "segredo_key_vault": "${KEY_VAULT_SECRET_FABRIC_SP_NAME}"},
+    "regra_classificacao": "regras-classificacao-pessoal",
+    "colecao": "${PURVIEW_COLLECTION_NAME}"
+  },
+  "gatilho": {
+    "tipo": "Recurrence",
+    "frequencia": "Day",
+    "intervalo": 1,
+    "hora_utc": "03:00",
+    "tipo_varredura": "Incremental"
+  },
+  "linhagem": {
+    "nivel": "item",
+    "de": "Relatorio_PowerBI",
+    "ate": "Fonte_Origem"
+  }
+}
