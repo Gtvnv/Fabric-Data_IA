@@ -1,14 +1,21 @@
-"""Gerador de dados sintéticos: parâmetros, validação e geração (Req. 2.1-2.8)."""
+"""Gerador de dados sintéticos: parâmetros, validação, geração e carga (Req. 2.1-2.10)."""
 
 from __future__ import annotations
 
+import abc
+import argparse
+import csv
 import dataclasses
+import io
 import math
+import os
 import random
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 from typing import Any
 
 from faker import Faker
@@ -462,3 +469,375 @@ def generate(p: GenParams) -> Dataset:
     for entity in ENTITIES:
         tables[entity], manifest[entity] = _apply_noise(entity, clean[entity], p.noise, rng)
     return Dataset(params=p, tables=tables, noise_manifest=manifest)
+
+
+# ---------------------------------------------------------------------------
+# Carga (Req. 2.9, 2.10)
+# ---------------------------------------------------------------------------
+
+#: Entidades transacionais vão para o Azure SQL; estoque vai como arquivo.
+SQL_ENTITIES = ("clientes", "produtos", "lojas", "vendas")
+OBJECT_ENTITIES = ("estoque",)
+
+DEST_SQL = "Azure SQL"
+DEST_OBJECT = "armazenamento de objetos"
+
+
+class DestinationError(RuntimeError):
+    """Falha em um destino; `destination` indica qual."""
+
+    def __init__(self, destination: str, message: str) -> None:
+        self.destination = destination
+        super().__init__(f"{destination}: {message}")
+
+
+class SqlSink(abc.ABC):
+    """Destino transacional com upsert por chave de negócio."""
+
+    @abc.abstractmethod
+    def validate(self) -> None:
+        """Levanta `DestinationError` se o destino não estiver utilizável."""
+
+    @abc.abstractmethod
+    def upsert(
+        self, entity: str, key_columns: tuple[str, ...], rows: list[dict[str, Any]]
+    ) -> None:
+        """Insere ou atualiza `rows` pela chave; todas as entidades ou nenhuma por chamada."""
+
+
+class ObjectSink(abc.ABC):
+    """Destino de arquivos; escrever um nome existente o sobrescreve."""
+
+    @abc.abstractmethod
+    def validate(self) -> None:
+        """Levanta `DestinationError` se o destino não estiver utilizável."""
+
+    @abc.abstractmethod
+    def put(self, name: str, data: bytes) -> None:
+        """Grava `data` em `name`, sobrescrevendo se existir."""
+
+
+class InMemorySqlSink(SqlSink):
+    """Fake em memória: `tables[entity][key] = row`. Falhas injetáveis para testes."""
+
+    def __init__(
+        self, fail_validate: bool = False, fail_entity: str | None = None
+    ) -> None:
+        self.tables: dict[str, dict[tuple[Any, ...], dict[str, Any]]] = {}
+        self.fail_validate = fail_validate
+        self.fail_entity = fail_entity
+
+    def validate(self) -> None:
+        if self.fail_validate:
+            raise DestinationError(DEST_SQL, "destino indisponível")
+
+    def upsert(
+        self, entity: str, key_columns: tuple[str, ...], rows: list[dict[str, Any]]
+    ) -> None:
+        if entity == self.fail_entity:
+            raise DestinationError(DEST_SQL, f"falha ao gravar {entity}")
+        table = self.tables.setdefault(entity, {})
+        for row in rows:
+            table[tuple(row[c] for c in key_columns)] = dict(row)
+
+
+class InMemoryObjectSink(ObjectSink):
+    """Fake em memória: `files[name] = bytes`."""
+
+    def __init__(self, fail_validate: bool = False, fail_put: bool = False) -> None:
+        self.files: dict[str, bytes] = {}
+        self.fail_validate = fail_validate
+        self.fail_put = fail_put
+
+    def validate(self) -> None:
+        if self.fail_validate:
+            raise DestinationError(DEST_OBJECT, "destino indisponível")
+
+    def put(self, name: str, data: bytes) -> None:
+        if self.fail_put:
+            raise DestinationError(DEST_OBJECT, f"falha ao gravar {name}")
+        self.files[name] = data
+
+
+class AzureSqlSink(SqlSink):
+    """Azure SQL via `pyodbc` (importado sob demanda). As tabelas já devem existir,
+    com o nome da entidade e as colunas de `COLUMNS`; datas são texto (ruído de data
+    inválida precisa chegar à Bronze)."""
+
+    def __init__(self, server: str, database: str, user: str, password: str) -> None:
+        self._conn_str = (
+            "Driver={ODBC Driver 18 for SQL Server};"
+            f"Server=tcp:{server},1433;Database={database};Uid={user};Pwd={password};"
+            "Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+        )
+
+    def _connect(self) -> Any:
+        try:
+            import pyodbc  # noqa: PLC0415
+        except ImportError as exc:
+            raise DestinationError(DEST_SQL, "pacote pyodbc não instalado") from exc
+        try:
+            return pyodbc.connect(self._conn_str)
+        except Exception as exc:
+            raise DestinationError(DEST_SQL, f"conexão falhou ({type(exc).__name__})") from exc
+
+    def validate(self) -> None:
+        conn = self._connect()
+        try:
+            cur = conn.cursor()
+            for entity in SQL_ENTITIES:
+                cur.execute(f"SELECT TOP 0 * FROM [{entity}]")  # entity vem de constante
+        except Exception as exc:
+            raise DestinationError(DEST_SQL, f"tabela inacessível ({type(exc).__name__})") from exc
+        finally:
+            conn.close()
+
+    def upsert(
+        self, entity: str, key_columns: tuple[str, ...], rows: list[dict[str, Any]]
+    ) -> None:
+        if entity not in SQL_ENTITIES:
+            raise DestinationError(DEST_SQL, f"entidade não suportada: {entity}")
+        cols = COLUMNS[entity]
+        non_key = [c for c in cols if c not in key_columns]
+        where = " AND ".join(f"[{c}] = ?" for c in key_columns)
+        sets = ", ".join(f"[{c}] = ?" for c in non_key)
+        insert = (
+            f"INSERT INTO [{entity}] ({', '.join(f'[{c}]' for c in cols)}) "
+            f"VALUES ({', '.join('?' for _ in cols)})"
+        )
+        update = f"UPDATE [{entity}] SET {sets} WHERE {where}"
+        conn = self._connect()
+        try:
+            cur = conn.cursor()
+            for row in rows:
+                cur.execute(update, [row[c] for c in non_key] + [row[c] for c in key_columns])
+                if cur.rowcount == 0:
+                    cur.execute(insert, [row[c] for c in cols])
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            raise DestinationError(
+                DEST_SQL, f"falha ao gravar {entity} ({type(exc).__name__})"
+            ) from exc
+        finally:
+            conn.close()
+
+
+class AzureObjectSink(ObjectSink):
+    """Armazenamento de objetos (Azure Blob) com `DefaultAzureCredential` (sem chave)."""
+
+    def __init__(self, account: str, container: str) -> None:
+        self._url = f"https://{account}.blob.core.windows.net"
+        self._container = container
+
+    def _container_client(self) -> Any:
+        try:
+            from azure.identity import DefaultAzureCredential  # noqa: PLC0415
+            from azure.storage.blob import BlobServiceClient  # noqa: PLC0415
+        except ImportError as exc:
+            raise DestinationError(DEST_OBJECT, "pacotes azure não instalados") from exc
+        service = BlobServiceClient(self._url, credential=DefaultAzureCredential())
+        return service.get_container_client(self._container)
+
+    def validate(self) -> None:
+        try:
+            self._container_client().get_container_properties()
+        except DestinationError:
+            raise
+        except Exception as exc:
+            raise DestinationError(
+                DEST_OBJECT, f"contêiner inacessível ({type(exc).__name__})"
+            ) from exc
+
+    def put(self, name: str, data: bytes) -> None:
+        try:
+            self._container_client().upload_blob(name, data, overwrite=True)
+        except DestinationError:
+            raise
+        except Exception as exc:
+            raise DestinationError(
+                DEST_OBJECT, f"falha ao gravar {name} ({type(exc).__name__})"
+            ) from exc
+
+
+@dataclass(frozen=True)
+class LoadReport:
+    """Resultado da carga. `counts` = registros distintos (por chave) gravados por entidade."""
+
+    success: bool
+    counts: dict[str, int] = dataclasses.field(default_factory=dict)
+    failed_destination: str | None = None
+    error: str | None = None
+
+
+def object_name(entity: str, p: GenParams) -> str:
+    """Nome determinístico do arquivo: depende só da entidade e dos parâmetros."""
+    return f"{entity}/{entity}_seed{p.seed}_{p.start.isoformat()}_{p.end.isoformat()}.csv"
+
+
+def to_csv_bytes(entity: str, rows: list[dict[str, Any]]) -> bytes:
+    buf = io.StringIO(newline="")
+    writer = csv.writer(buf, lineterminator="\n")
+    cols = COLUMNS[entity]
+    writer.writerow(cols)
+    for row in rows:
+        writer.writerow(["" if row[c] is None else row[c] for c in cols])
+    return buf.getvalue().encode("utf-8")
+
+
+def _distinct_by_key(entity: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    keys = KEY_COLUMNS[entity]
+    unique: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        unique[tuple(row[c] for c in keys)] = row  # a última ocorrência vence
+    return list(unique.values())
+
+
+def load(ds: Dataset, sql: SqlSink, obj: ObjectSink) -> LoadReport:
+    """Carrega o dataset nos dois destinos (Req. 2.9, 2.10).
+
+    Ambos são validados antes de qualquer gravação. Falha em qualquer destino torna a
+    carga um fracasso, com o destino identificado; sucesso só se os dois foram gravados.
+    Reexecutar é seguro: upsert por chave no SQL e sobrescrita por nome determinístico.
+    """
+    for dest, sink in ((DEST_SQL, sql), (DEST_OBJECT, obj)):
+        try:
+            sink.validate()
+        except Exception as exc:
+            return LoadReport(False, {}, dest, str(exc))
+
+    counts: dict[str, int] = {}
+    try:
+        for entity in SQL_ENTITIES:
+            rows = _distinct_by_key(entity, ds.tables[entity])
+            sql.upsert(entity, KEY_COLUMNS[entity], rows)
+            counts[entity] = len(rows)
+    except Exception as exc:
+        return LoadReport(False, counts, DEST_SQL, str(exc))
+    try:
+        for entity in OBJECT_ENTITIES:
+            rows = ds.tables[entity]
+            obj.put(object_name(entity, ds.params), to_csv_bytes(entity, rows))
+            counts[entity] = len(_distinct_by_key(entity, rows))
+    except Exception as exc:
+        return LoadReport(False, counts, DEST_OBJECT, str(exc))
+    return LoadReport(True, counts)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+
+def load_dotenv(path: Path) -> None:
+    """Carrega `KEY=VALUE` de um `.env` sem sobrescrever variáveis já definidas."""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip().strip("'\"")
+        if value.startswith("<") and value.endswith(">"):
+            continue  # placeholder do .env.example, equivale a não definido
+        os.environ.setdefault(key.strip(), value)
+
+
+def _env_defaults() -> dict[str, str | None]:
+    return {
+        "seed": os.environ.get("SYNTH_SEED"),
+        "n_customers": os.environ.get("SYNTH_N_CUSTOMERS"),
+        "n_products": os.environ.get("SYNTH_N_PRODUCTS"),
+        "n_stores": os.environ.get("SYNTH_N_STORES"),
+        "start": os.environ.get("SYNTH_START"),
+        "end": os.environ.get("SYNTH_END"),
+        "dup_pct": os.environ.get("SYNTH_DUP_PCT"),
+        "null_pct": os.environ.get("SYNTH_NULL_PCT"),
+        "bad_date_pct": os.environ.get("SYNTH_BAD_DATE_PCT"),
+    }
+
+
+def _to_int(name: str, text: str | None) -> int | None:
+    if text is None or text == "":
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        raise ParamError(name, f"Parâmetro {name} deve ser inteiro") from None
+
+
+def _to_float(name: str, text: str | None) -> float:
+    if text is None or text == "":
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        raise ParamError(name, f"Parâmetro {name} deve ser numérico") from None
+
+
+def params_from_args(argv: list[str] | None = None) -> GenParams:
+    """Flags de linha de comando têm precedência sobre as variáveis `SYNTH_*`."""
+    parser = argparse.ArgumentParser(description="Gerador de dados sintéticos")
+    for name in ("seed", "n_customers", "n_products", "n_stores", "start", "end"):
+        parser.add_argument(f"--{name.replace('_', '-')}", dest=name)
+    for name in _NOISE_FIELDS:
+        parser.add_argument(f"--{name.replace('_', '-')}", dest=name)
+    parser.add_argument("--env-file", default=".env")
+    args = parser.parse_args(argv)
+    load_dotenv(Path(args.env_file))
+    defaults = _env_defaults()
+    merged = {k: (getattr(args, k) if getattr(args, k) is not None else v)
+              for k, v in defaults.items()}
+    raw: dict[str, Any] = {
+        name: _to_int(name, merged[name])
+        for name in ("seed", "n_customers", "n_products", "n_stores")
+    }
+    raw["start"], raw["end"] = merged["start"], merged["end"]
+    raw["noise"] = {f: _to_float(f, merged[f]) for f in _NOISE_FIELDS}
+    return validate(raw)
+
+
+def _require_env(name: str) -> str:
+    value = os.environ.get(name, "")
+    if not value or (value.startswith("<") and value.endswith(">")):
+        raise DestinationError("configuração", f"variável {name} não preenchida")
+    return value
+
+
+def build_sinks() -> tuple[SqlSink, ObjectSink]:
+    sql = AzureSqlSink(
+        _require_env("AZURE_SQL_SERVER"),
+        _require_env("AZURE_SQL_DATABASE"),
+        _require_env("AZURE_SQL_USER"),
+        _require_env("AZURE_SQL_PASSWORD"),
+    )
+    obj = AzureObjectSink(
+        _require_env("OBJECT_STORAGE_ACCOUNT"), _require_env("OBJECT_STORAGE_CONTAINER")
+    )
+    return sql, obj
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Códigos de saída: 0 sucesso, 1 falha de carga/configuração, 2 parâmetro inválido."""
+    try:
+        params = params_from_args(argv)
+    except ParamError as exc:
+        print(f"Parâmetro inválido ({exc.param}): {exc}", file=sys.stderr)
+        return 2
+    try:
+        sql, obj = build_sinks()
+    except DestinationError as exc:
+        print(f"Falha: {exc}", file=sys.stderr)
+        return 1
+    report = load(generate(params), sql, obj)
+    for entity, n in report.counts.items():
+        print(f"{entity}: {n}")
+    if not report.success:
+        print(f"Falha no destino {report.failed_destination}: {report.error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
