@@ -1,0 +1,60 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "card_alto_risco",
+  "position": {
+    "x": 240,
+    "y": 100,
+    "z": 5,
+    "width": 200,
+    "height": 90,
+    "tabOrder": 5
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "previsao_churn"
+                    }
+                  },
+                  "Property": "Clientes Alto Risco"
+                }
+              },
+              "queryRef": "previsao_churn.Clientes Alto Risco",
+              "nativeQueryRef": "Clientes Alto Risco"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Clientes em alto risco'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

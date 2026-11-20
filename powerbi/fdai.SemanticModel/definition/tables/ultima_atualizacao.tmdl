@@ -10,6 +10,8 @@ table ultima_atualizacao
 		dataType: string
 		sourceColumn: ts_sao_paulo_texto
 
+	measure 'Ultima Atualizacao' = COALESCE(MAX(ultima_atualizacao[ts_sao_paulo_texto]), "Sem dados")
+
 	partition ultima_atualizacao = entity
 		mode: directLake
 		source

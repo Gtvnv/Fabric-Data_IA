@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "barra_categoria",
+  "position": {
+    "x": 20,
+    "y": 100,
+    "z": 4,
+    "width": 610,
+    "height": 300,
+    "tabOrder": 4
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_produto"
+                    }
+                  },
+                  "Property": "categoria"
+                }
+              },
+              "queryRef": "dim_produto.categoria",
+              "nativeQueryRef": "categoria"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "agg_vendas_dia"
+                    }
+                  },
+                  "Property": "Receita Agg"
+                }
+              },
+              "queryRef": "agg_vendas_dia.Receita Agg",
+              "nativeQueryRef": "Receita Agg"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Receita por categoria'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

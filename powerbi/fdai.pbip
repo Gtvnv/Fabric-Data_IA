@@ -1,6 +1,12 @@
 {
   "version": "1.0",
-  "artifacts": [],
+  "artifacts": [
+    {
+      "report": {
+        "path": "fdai.Report"
+      }
+    }
+  ],
   "settings": {
     "enableAutoRecovery": true
   }

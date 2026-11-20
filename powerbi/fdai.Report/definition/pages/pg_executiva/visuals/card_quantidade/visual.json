@@ -1,0 +1,60 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "card_quantidade",
+  "position": {
+    "x": 240,
+    "y": 100,
+    "z": 5,
+    "width": 200,
+    "height": 90,
+    "tabOrder": 5
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "agg_vendas_dia"
+                    }
+                  },
+                  "Property": "Quantidade Agg"
+                }
+              },
+              "queryRef": "agg_vendas_dia.Quantidade Agg",
+              "nativeQueryRef": "Quantidade Agg"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Quantidade'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

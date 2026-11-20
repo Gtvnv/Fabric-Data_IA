@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "linha_churn",
+  "position": {
+    "x": 20,
+    "y": 210,
+    "z": 6,
+    "width": 1240,
+    "height": 490,
+    "tabOrder": 6
+  },
+  "visual": {
+    "visualType": "lineChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "previsao_churn"
+                    }
+                  },
+                  "Property": "data_ref"
+                }
+              },
+              "queryRef": "previsao_churn.data_ref",
+              "nativeQueryRef": "data_ref"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "previsao_churn"
+                    }
+                  },
+                  "Property": "Prob Churn Media"
+                }
+              },
+              "queryRef": "previsao_churn.Prob Churn Media",
+              "nativeQueryRef": "Prob Churn Media"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Churn médio por data de referência'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

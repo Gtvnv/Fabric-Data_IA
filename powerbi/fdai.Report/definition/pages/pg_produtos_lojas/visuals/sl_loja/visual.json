@@ -1,0 +1,43 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "sl_loja",
+  "position": {
+    "x": 340,
+    "y": 10,
+    "z": 1,
+    "width": 300,
+    "height": 70,
+    "tabOrder": 1
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_loja"
+                    }
+                  },
+                  "Property": "nome"
+                }
+              },
+              "queryRef": "dim_loja.nome",
+              "nativeQueryRef": "nome"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "syncGroup": {
+      "groupName": "loja",
+      "fieldChanges": true,
+      "filterChanges": true
+    }
+  }
+}

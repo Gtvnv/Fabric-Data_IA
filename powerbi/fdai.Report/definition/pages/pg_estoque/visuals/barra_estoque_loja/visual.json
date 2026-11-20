@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "barra_estoque_loja",
+  "position": {
+    "x": 650,
+    "y": 210,
+    "z": 7,
+    "width": 610,
+    "height": 490,
+    "tabOrder": 7
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_loja"
+                    }
+                  },
+                  "Property": "nome"
+                }
+              },
+              "queryRef": "dim_loja.nome",
+              "nativeQueryRef": "nome"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "estoque"
+                    }
+                  },
+                  "Property": "Estoque Total"
+                }
+              },
+              "queryRef": "estoque.Estoque Total",
+              "nativeQueryRef": "Estoque Total"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Estoque por loja'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

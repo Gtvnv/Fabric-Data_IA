@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "barra_loja",
+  "position": {
+    "x": 650,
+    "y": 100,
+    "z": 5,
+    "width": 610,
+    "height": 300,
+    "tabOrder": 5
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_loja"
+                    }
+                  },
+                  "Property": "nome"
+                }
+              },
+              "queryRef": "dim_loja.nome",
+              "nativeQueryRef": "nome"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "agg_vendas_dia"
+                    }
+                  },
+                  "Property": "Receita Agg"
+                }
+              },
+              "queryRef": "agg_vendas_dia.Receita Agg",
+              "nativeQueryRef": "Receita Agg"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Receita por loja'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

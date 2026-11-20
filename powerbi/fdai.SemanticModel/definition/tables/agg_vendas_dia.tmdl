@@ -38,6 +38,21 @@ table agg_vendas_dia
 		summarizeBy: none
 		sourceColumn: custo_total
 
+	measure 'Receita Agg' = SUM(agg_vendas_dia[valor_venda])
+		formatString: "R$ #,0.00"
+
+	measure 'Quantidade Agg' = SUM(agg_vendas_dia[quantidade])
+		formatString: #,0
+
+	measure 'Margem Agg' = [Receita Agg] - SUM(agg_vendas_dia[custo_total])
+		formatString: "R$ #,0.00"
+
+	measure 'Receita Agg LY' = CALCULATE([Receita Agg], SAMEPERIODLASTYEAR(dim_calendario[data]))
+		formatString: "R$ #,0.00"
+
+	measure 'Variacao YoY Agg' = DIVIDE([Receita Agg] - [Receita Agg LY], [Receita Agg LY])
+		formatString: 0.00%
+
 	partition agg_vendas_dia = entity
 		mode: directLake
 		source

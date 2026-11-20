@@ -1,0 +1,60 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "card_yoy",
+  "position": {
+    "x": 680,
+    "y": 100,
+    "z": 7,
+    "width": 200,
+    "height": 90,
+    "tabOrder": 7
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "agg_vendas_dia"
+                    }
+                  },
+                  "Property": "Variacao YoY Agg"
+                }
+              },
+              "queryRef": "agg_vendas_dia.Variacao YoY Agg",
+              "nativeQueryRef": "Variacao YoY Agg"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Variação YoY'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

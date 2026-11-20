@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "barra_margem_regiao",
+  "position": {
+    "x": 240,
+    "y": 420,
+    "z": 7,
+    "width": 1020,
+    "height": 280,
+    "tabOrder": 7
+  },
+  "visual": {
+    "visualType": "clusteredColumnChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_loja"
+                    }
+                  },
+                  "Property": "regiao"
+                }
+              },
+              "queryRef": "dim_loja.regiao",
+              "nativeQueryRef": "regiao"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "agg_vendas_dia"
+                    }
+                  },
+                  "Property": "Margem Agg"
+                }
+              },
+              "queryRef": "agg_vendas_dia.Margem Agg",
+              "nativeQueryRef": "Margem Agg"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Margem por região'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

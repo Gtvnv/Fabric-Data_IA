@@ -28,6 +28,12 @@ table estoque
 		summarizeBy: none
 		sourceColumn: quantidade_estoque
 
+	measure 'Estoque Total' = SUM(estoque[quantidade_estoque])
+		formatString: #,0
+
+	measure 'Itens Sem Estoque' = COUNTROWS(FILTER(estoque, estoque[quantidade_estoque] <= 0))
+		formatString: #,0
+
 	partition estoque = entity
 		mode: directLake
 		source

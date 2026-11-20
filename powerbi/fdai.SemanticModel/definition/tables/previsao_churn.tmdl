@@ -31,6 +31,12 @@ table previsao_churn
 		formatString: dd/mm/yyyy hh:mm:ss
 		sourceColumn: pontuado_em_utc
 
+	measure 'Prob Churn Media' = AVERAGE(previsao_churn[prob_churn])
+		formatString: 0.00%
+
+	measure 'Clientes Alto Risco' = COUNTROWS(FILTER(previsao_churn, previsao_churn[prob_churn] >= 0.5))
+		formatString: #,0
+
 	partition previsao_churn = entity
 		mode: directLake
 		source

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.0.0/schema.json",
+  "name": "sl_categoria",
+  "position": {
+    "x": 660,
+    "y": 10,
+    "z": 2,
+    "width": 300,
+    "height": 70,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "slicer",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dim_produto"
+                    }
+                  },
+                  "Property": "categoria"
+                }
+              },
+              "queryRef": "dim_produto.categoria",
+              "nativeQueryRef": "categoria"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "syncGroup": {
+      "groupName": "categoria",
+      "fieldChanges": true,
+      "filterChanges": true
+    }
+  }
+}

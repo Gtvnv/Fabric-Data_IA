@@ -38,6 +38,9 @@ table previsao_demanda
 		formatString: dd/mm/yyyy hh:mm:ss
 		sourceColumn: pontuado_em_utc
 
+	measure 'Demanda Prevista' = SUM(previsao_demanda[previsao])
+		formatString: #,0
+
 	partition previsao_demanda = entity
 		mode: directLake
 		source
