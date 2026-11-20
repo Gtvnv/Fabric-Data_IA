@@ -27,7 +27,7 @@ def select_incremental(rows: Iterable[Row], watermark_col: str, last_wm: Any) ->
     """Sem marca persistida -> todos; senão somente ``col > last_wm`` (Req. 3.4)."""
     if last_wm is None:
         return [dict(r) for r in rows]
-    return [dict(r) for r in rows if r.get(watermark_col) is not None and r[watermark_col] > last_wm]
+    return [\n        dict(r) for r in rows if r.get(watermark_col) is not None and r[watermark_col] > last_wm\n    ]
 
 
 def next_watermark(written_rows: Iterable[Row], watermark_col: str, previous: Any) -> Any:
@@ -39,7 +39,7 @@ def next_watermark(written_rows: Iterable[Row], watermark_col: str, previous: An
     return new if previous is None or new > previous else previous
 
 
-def add_ingestion_metadata(row: Mapping[str, Any], run_id: str, source: str, now_utc: datetime) -> Row:
+def add_ingestion_metadata(\n    row: Mapping[str, Any], run_id: str, source: str, now_utc: datetime\n) -> Row:
     """Acrescenta metadados de ingestão sem alterar os valores de origem (Req. 3.3, 4.1)."""
     if not run_id or not source:
         raise ValueError("run_id e source são obrigatórios e não nulos")
@@ -85,7 +85,7 @@ def run_with_retry(
     wait_s: float = 60,
     sleep: Callable[[float], None] = time.sleep,
 ) -> Result:
-    """Executa ``op`` até ``retries + 1`` vezes, esperando ``wait_s`` entre tentativas (Req. 3.8)."""
+    """Executa ``op`` até ``retries + 1`` vezes, com ``wait_s`` entre tentativas (Req. 3.8)."""
     if retries < 0:
         raise ValueError("retries deve ser >= 0")
     last: BaseException | None = None
@@ -110,6 +110,12 @@ class RunStatus:
         return self.status == STATUS_SUCCESS
 
 
+def _entity_name(ent: Any) -> str:
+    if isinstance(ent, Mapping):
+        return str(ent.get("entidade", ent))
+    return ent if isinstance(ent, str) else str(getattr(ent, "name", ent))
+
+
 def run_entities(entities: Sequence[Any], runner: Callable[[Any], Any]) -> RunStatus:
     """Processa todas as entidades; falha de uma não interrompe as demais (Req. 3.12).
 
@@ -120,7 +126,7 @@ def run_entities(entities: Sequence[Any], runner: Callable[[Any], Any]) -> RunSt
     succeeded: list[str] = []
     failed: dict[str, BaseException] = {}
     for ent in entities:
-        name = ent if isinstance(ent, str) else str(getattr(ent, "name", None) or (ent.get("entidade") if isinstance(ent, Mapping) else ent))
+        name = _entity_name(ent)
         try:
             runner(ent)
             succeeded.append(name)
