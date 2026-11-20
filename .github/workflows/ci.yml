@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GITLEAKS_VERSION: "8.18.4"
+
+jobs:
+  validate:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (full history for secret scan)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Java (PySpark tests)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Syntax check of notebooks
+        run: |
+          python - <<'PY'
+          import pathlib, py_compile, sys
+          files = sorted(pathlib.Path("notebooks").rglob("*.py"))
+          failed = False
+          for f in files:
+              try:
+                  py_compile.compile(str(f), doraise=True, cfile="/dev/null")
+              except py_compile.PyCompileError as exc:
+                  failed = True
+                  print(f"::error file={f}::{exc.msg}")
+          print(f"Checked {len(files)} notebook file(s).")
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Tests (pytest, Hypothesis profile ci)
+        env:
+          HYPOTHESIS_PROFILE: ci
+        run: python -m pytest
+
+      - name: Validate ADRs and data dictionary
+        run: |
+          python - <<'PY'
+          import pathlib, sys
+          from platform_lib.docs_tools import adr_number, validate_adr
+
+          adr_dir = pathlib.Path("docs/adr")
+          files = sorted(adr_dir.glob("*.md")) if adr_dir.is_dir() else []
+          numbers = [n for n in (adr_number(f.name) for f in files) if n]
+          problems = []
+          for f in files:
+              number = adr_number(f.name)
+              if number is None:
+                  if f.name.lower() != "readme.md":
+                      problems.append(f"{f}: nome fora do padrao NNNN-titulo.md")
+                  continue
+              others = [n for n in numbers if n != number]
+              for p in validate_adr(number, f.read_text(encoding="utf-8"), others):
+                  problems.append(f"{f}: {p}")
+          for p in problems:
+              print(f"::error::{p}")
+          print(f"Checked {len(files)} ADR file(s).")
+          sys.exit(1 if problems else 0)
+          PY
+          # Data dictionary coverage (validate_data_dictionary) is exercised by pytest above.
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          rm gitleaks.tar.gz
+          gitleaks version
+
+      - name: Secret scan (gitleaks, redacted)
+        # Tool failure, timeout or findings fail the check (decide_scan).
+        # Report lists file and line only, never the secret value.
+        run: python -m platform_lib.secrets_scan .
