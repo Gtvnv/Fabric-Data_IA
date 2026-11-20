@@ -1,0 +1,41 @@
+table logs
+	lineageTag: 93c4e8b7-1f26-5a0d-b5e9-4a7d2c6f8e63
+
+	column run_id
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: run_id
+
+	column componente
+		dataType: string
+		summarizeBy: none
+		sourceColumn: componente
+
+	column nivel
+		dataType: string
+		summarizeBy: none
+		sourceColumn: nivel
+
+	column ts_utc
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		summarizeBy: none
+		sourceColumn: ts_utc
+
+	column mensagem
+		dataType: string
+		summarizeBy: none
+		sourceColumn: mensagem
+
+	measure 'Logs de Erro' = ```
+			CALCULATE(COUNTROWS(logs), logs[nivel] IN {"ERROR", "CRITICAL", "error", "critical"})
+			```
+		formatString: #,0
+
+	partition logs = entity
+		mode: directLake
+		source
+			entityName: logs
+			schemaName: ops
+			expressionSource: DatabaseQuery

@@ -1,0 +1,7 @@
+relationship execucoes_etapas_run_id_execucoes_run_id
+	fromColumn: execucoes_etapas.run_id
+	toColumn: execucoes.run_id
+
+relationship logs_run_id_execucoes_run_id
+	fromColumn: logs.run_id
+	toColumn: execucoes.run_id

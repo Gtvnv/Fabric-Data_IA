@@ -1,0 +1,53 @@
+table execucoes_etapas
+	lineageTag: 7e2a9d10-4c58-5b37-a6f4-1d0b8c3e9f42
+
+	column run_id
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: run_id
+
+	column etapa
+		dataType: string
+		summarizeBy: none
+		sourceColumn: etapa
+
+	column inicio
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		summarizeBy: none
+		sourceColumn: inicio
+
+	column fim
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		summarizeBy: none
+		sourceColumn: fim
+
+	column status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: status
+
+	column registros
+		dataType: int64
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: registros
+
+	/// Duração da etapa em segundos.
+	measure 'Duracao Etapa (s)' = ```
+			IF(
+			    ISBLANK(MAX(execucoes_etapas[fim])),
+			    BLANK(),
+			    DATEDIFF(MIN(execucoes_etapas[inicio]), MAX(execucoes_etapas[fim]), SECOND)
+			)
+			```
+		formatString: #,0
+
+	partition execucoes_etapas = entity
+		mode: directLake
+		source
+			entityName: execucoes_etapas
+			schemaName: audit
+			expressionSource: DatabaseQuery

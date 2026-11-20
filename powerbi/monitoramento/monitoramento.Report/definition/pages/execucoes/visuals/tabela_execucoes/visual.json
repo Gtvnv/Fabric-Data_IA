@@ -1,0 +1,117 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "tabela_execucoes",
+  "position": { "x": 20, "y": 150, "z": 2, "width": 1240, "height": 550 },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "run_id"
+                }
+              },
+              "queryRef": "execucoes.run_id"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "inicio"
+                }
+              },
+              "queryRef": "execucoes.inicio"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "fim"
+                }
+              },
+              "queryRef": "execucoes.fim"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "Duracao (s)"
+                }
+              },
+              "queryRef": "execucoes.Duracao (s)"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "Status da Execucao"
+                }
+              },
+              "queryRef": "execucoes.Status da Execucao"
+            },
+            {
+              "field": {
+                "Measure": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "Registros Processados"
+                }
+              },
+              "queryRef": "execucoes.Registros Processados"
+            }
+          ]
+        },
+        "SortDefinition": {
+          "sort": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": { "SourceRef": { "Entity": "execucoes" } },
+                  "Property": "inicio"
+                }
+              },
+              "direction": "Descending"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "filterConfig": {
+    "filters": [
+      {
+        "name": "filtro_30_dias",
+        "field": {
+          "Measure": {
+            "Expression": { "SourceRef": { "Entity": "execucoes" } },
+            "Property": "Na Janela 30 dias"
+          }
+        },
+        "type": "Advanced",
+        "filter": {
+          "Version": 2,
+          "From": [{ "Name": "e", "Entity": "execucoes", "Type": 0 }],
+          "Where": [
+            {
+              "Condition": {
+                "Comparison": {
+                  "ComparisonKind": 0,
+                  "Left": {
+                    "Measure": {
+                      "Expression": { "SourceRef": { "Source": "e" } },
+                      "Property": "Na Janela 30 dias"
+                    }
+                  },
+                  "Right": { "Literal": { "Value": "1L" } }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

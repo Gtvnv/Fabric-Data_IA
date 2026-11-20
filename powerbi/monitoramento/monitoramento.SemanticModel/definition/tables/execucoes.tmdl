@@ -1,0 +1,90 @@
+table execucoes
+	lineageTag: 0b7f1c4e-2a63-5d98-8f10-6a3e9c5d7e21
+
+	column run_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: run_id
+
+	column run_original_id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: run_original_id
+
+	column inicio
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		summarizeBy: none
+		sourceColumn: inicio
+
+	column fim
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:mm:ss
+		summarizeBy: none
+		sourceColumn: fim
+
+	column status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: status
+
+	/// Duração da execução em segundos (inicio e fim estão em UTC). Vazia enquanto a execução não terminou.
+	measure 'Duracao (s)' = ```
+			IF(
+			    ISBLANK(MAX(execucoes[fim])),
+			    BLANK(),
+			    DATEDIFF(MIN(execucoes[inicio]), MAX(execucoes[fim]), SECOND)
+			)
+			```
+		formatString: #,0
+
+	/// sucesso, falha ou em execução (execução sem término).
+	measure 'Status da Execucao' = ```
+			IF(
+			    ISBLANK(MAX(execucoes[fim])),
+			    "em execução",
+			    SWITCH(
+			        LOWER(SELECTEDVALUE(execucoes[status], "falha")),
+			        "sucesso", "sucesso",
+			        "falha"
+			    )
+			)
+			```
+
+	/// 1 quando a execução iniciou nos últimos 30 dias (UTC).
+	measure 'Na Janela 30 dias' = ```
+			IF(MAX(execucoes[inicio]) >= UTCNOW() - 30, 1, 0)
+			```
+		formatString: 0
+
+	measure 'Execucoes 30 dias' = ```
+			CALCULATE(
+			    COUNTROWS(execucoes),
+			    FILTER(execucoes, execucoes[inicio] >= UTCNOW() - 30)
+			)
+			```
+		formatString: #,0
+
+	measure 'Execucoes com Falha 30 dias' = ```
+			CALCULATE(
+			    COUNTROWS(execucoes),
+			    FILTER(
+			        execucoes,
+			        execucoes[inicio] >= UTCNOW() - 30
+			            && NOT ISBLANK(execucoes[fim])
+			            && LOWER(execucoes[status]) <> "sucesso"
+			    )
+			)
+			```
+		formatString: #,0
+
+	/// Registros processados pelas etapas da execução (soma de audit.execucoes_etapas.registros).
+	measure 'Registros Processados' = SUM(execucoes_etapas[registros])
+		formatString: #,0
+
+	partition execucoes = entity
+		mode: directLake
+		source
+			entityName: execucoes
+			schemaName: audit
+			expressionSource: DatabaseQuery
