@@ -1,0 +1,24 @@
+# Regras de qualidade (Req. 5.7). type: unique | not_null | referential;
+# severity: blocking | warning.
+rules:
+  # Unicidade das chaves de negócio
+  - {name: clientes_pk_unica, table: silver.clientes, type: unique, columns: [cliente_id], severity: blocking}
+  - {name: produtos_pk_unica, table: silver.produtos, type: unique, columns: [produto_id], severity: blocking}
+  - {name: lojas_pk_unica, table: silver.lojas, type: unique, columns: [loja_id], severity: blocking}
+  - {name: vendas_pk_unica, table: silver.vendas, type: unique, columns: [venda_id], severity: blocking}
+  - {name: estoque_pk_unica, table: silver.estoque, type: unique, columns: [produto_id, loja_id, data_posicao], severity: blocking}
+
+  # Colunas obrigatórias
+  - {name: clientes_obrigatorios, table: silver.clientes, type: not_null, columns: [cliente_id, nome, data_cadastro], severity: blocking}
+  - {name: produtos_obrigatorios, table: silver.produtos, type: not_null, columns: [produto_id, nome, categoria], severity: blocking}
+  - {name: lojas_obrigatorios, table: silver.lojas, type: not_null, columns: [loja_id, nome], severity: blocking}
+  - {name: vendas_obrigatorios, table: silver.vendas, type: not_null, columns: [venda_id, cliente_id, produto_id, loja_id, data_venda, quantidade, valor_venda], severity: blocking}
+  - {name: estoque_obrigatorios, table: silver.estoque, type: not_null, columns: [produto_id, loja_id, data_posicao, quantidade_estoque], severity: blocking}
+  - {name: clientes_contato_preenchido, table: silver.clientes, type: not_null, columns: [email], severity: warning}
+
+  # Integridade referencial fato -> dimensões
+  - {name: vendas_cliente_fk, table: silver.vendas, type: referential, columns: [cliente_id], ref_table: silver.clientes, ref_columns: [cliente_id], severity: blocking}
+  - {name: vendas_produto_fk, table: silver.vendas, type: referential, columns: [produto_id], ref_table: silver.produtos, ref_columns: [produto_id], severity: blocking}
+  - {name: vendas_loja_fk, table: silver.vendas, type: referential, columns: [loja_id], ref_table: silver.lojas, ref_columns: [loja_id], severity: blocking}
+  - {name: estoque_produto_fk, table: silver.estoque, type: referential, columns: [produto_id], ref_table: silver.produtos, ref_columns: [produto_id], severity: blocking}
+  - {name: estoque_loja_fk, table: silver.estoque, type: referential, columns: [loja_id], ref_table: silver.lojas, ref_columns: [loja_id], severity: blocking}
